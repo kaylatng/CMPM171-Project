@@ -13,7 +13,7 @@ public class PlayerNetwork : NetworkBehaviour {
 			IsReady = false,
 			CardsInHandCount = 0,
 			PlayerName = "Placeholder Name",
-		}
+		}, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server
 	);
 
 	public struct PlayerData : INetworkSerializable {
@@ -64,8 +64,9 @@ public class PlayerNetwork : NetworkBehaviour {
 	}
 
 	[ServerRpc]
-	private void UpdatePlayerStateServerRpc() {
-		Debug.Log("UpdatePlayerStateServerRpc " + OwnerClientId);
+	private void UpdatePlayerStateServerRpc(ServerRpcParams serverRpcParams = default) {
+		Debug.Log("UpdatePlayerStateServerRpc " + OwnerClientId + "; " + serverRpcParams.Receive.SenderClientId);
+		var senderId = serverRpcParams.Receive.SenderClientId;
 		PlayerData data = playerData.Value;
 
 		data.Health -= 1;
@@ -73,5 +74,16 @@ public class PlayerNetwork : NetworkBehaviour {
 		data.PlayerName = "Molly";
 		
 		playerData.Value = data;
+
+		NotifyPlayerPokedClientRpc(senderId);
+	}
+
+	[ClientRpc]
+	private void NotifyPlayerPokedClientRpc(ulong playerId) {
+		if (playerId == NetworkManager.Singleton.LocalClientId) {
+			Debug.Log("T pressed, server acknowledged");
+		} else {
+			Debug.Log($"playerId: {playerId} pressed T");
+		}
 	}
 }
