@@ -36,7 +36,7 @@ public class PlayerNetwork : NetworkBehaviour {
 
 	public override void OnNetworkSpawn() {
 		playerData.OnValueChanged += (PlayerData previousValue, PlayerData newValue) => {
-			Debug.Log(OwnerClientId + "; " + newValue.Health + "; " + newValue.IsReady + "; " + newValue.PlayerName);
+			Debug.Log(OwnerClientId + "; " + newValue.Health + "; " + newValue.IsReady + "; " + newValue.PlayerName + "; Cards in hand: " + newValue.CardsInHandCount);
 		};
 	}
 
@@ -61,6 +61,10 @@ public class PlayerNetwork : NetworkBehaviour {
 			playerData.Value = data;
 			*/
 		}
+
+		if (Keyboard.current.dKey.wasPressedThisFrame) {
+			RequestCardDrawServerRpc();
+		}
 	}
 
 	[ServerRpc]
@@ -71,11 +75,33 @@ public class PlayerNetwork : NetworkBehaviour {
 
 		data.Health -= 1;
 		data.IsReady = !data.IsReady;
-		data.PlayerName = "Molly";
+		data.PlayerName = (senderId == 0) ? "Host" : "Client";
 		
 		playerData.Value = data;
 
 		NotifyPlayerPokedClientRpc(senderId);
+	}
+
+	[ServerRpc]
+	private void RequestCardDrawServerRpc(ServerRpcParams serverRpcParams = default) {
+		Debug.Log("RequestCardDrawServerRpc " + OwnerClientId + "; " + serverRpcParams.Receive.SenderClientId);
+		int drawnCardId = DeckManager.Instance.DrawCard();
+
+		if (drawnCardId == -1) {
+			Debug.Log("Deck is empty");
+			return;
+		}
+
+		PlayerData data = playerData.Value;
+		data.CardsInHandCount++;
+		playerData.Value = data;
+
+		ClientRpcParams targetedParams = new ClientRpcParams {
+			Send = new ClientRpcSendParams {
+				TargetClientIds = new ulong[] { serverRpcParams.Receive.SenderClientId }
+			}
+		};
+		ReceiveCardClientRpc(drawnCardId, targetedParams);
 	}
 
 	[ClientRpc]
@@ -84,6 +110,15 @@ public class PlayerNetwork : NetworkBehaviour {
 			Debug.Log("T pressed, server acknowledged");
 		} else {
 			Debug.Log($"playerId: {playerId} pressed T");
+		}
+	}
+
+	[ClientRpc]
+	private void ReceiveCardClientRpc(int cardId, ClientRpcParams clientRpcParams = default) {
+		if (cardId >= 60 && cardId <= 65 ) {
+			Debug.Log("Drew modifier card");
+		} else {
+			Debug.Log($"Drew spell ID: {cardId}");
 		}
 	}
 }
