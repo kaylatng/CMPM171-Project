@@ -5,7 +5,12 @@ using UnityEngine.InputSystem;
 
 public class PlayerNetwork : NetworkBehaviour {
 
-    private NetworkVariable<PlayerData> playerData = new NetworkVariable<PlayerData>(
+	[SerializeField] private GameObject cardPrefab;
+	[SerializeField] private Transform playerHandZone;
+	[SerializeField] private Transform opponentHandZone;
+
+
+	private NetworkVariable<PlayerData> playerData = new NetworkVariable<PlayerData>(
 		new PlayerData {
 			Health = 20,
 			Mana = 0,
@@ -35,6 +40,10 @@ public class PlayerNetwork : NetworkBehaviour {
 	}
 
 	public override void OnNetworkSpawn() {
+		if (IsOwner) {
+			playerHandZone = GameObject.Find("PlayerHandZone").transform;
+			opponentHandZone = GameObject.Find("OpponentHandZone").transform;
+		}
 		playerData.OnValueChanged += (PlayerData previousValue, PlayerData newValue) => {
 			Debug.Log(OwnerClientId + "; " + newValue.Health + "; " + newValue.IsReady + "; " + newValue.PlayerName + "; Cards in hand: " + newValue.CardsInHandCount);
 		};
@@ -85,6 +94,7 @@ public class PlayerNetwork : NetworkBehaviour {
 	[ServerRpc]
 	private void RequestCardDrawServerRpc(ServerRpcParams serverRpcParams = default) {
 		Debug.Log("RequestCardDrawServerRpc " + OwnerClientId + "; " + serverRpcParams.Receive.SenderClientId);
+		var senderId = serverRpcParams.Receive.SenderClientId;
 		int drawnCardId = DeckManager.Instance.DrawCard();
 
 		if (drawnCardId == -1) {
@@ -96,12 +106,24 @@ public class PlayerNetwork : NetworkBehaviour {
 		data.CardsInHandCount++;
 		playerData.Value = data;
 
-		ClientRpcParams targetedParams = new ClientRpcParams {
+		// send card ID to drawing player
+		ClientRpcParams drawerParams = new ClientRpcParams {
 			Send = new ClientRpcSendParams {
-				TargetClientIds = new ulong[] { serverRpcParams.Receive.SenderClientId }
+				TargetClientIds = new ulong[] { senderId }
 			}
 		};
-		ReceiveCardClientRpc(drawnCardId, targetedParams);
+		ReceiveCardClientRpc(drawnCardId, true, drawerParams);
+
+		// tell other player to show hidden card
+		ulong opponentId = GetOpponentId(senderId);
+		if (opponentId != senderId) {
+			ClientRpcParams othersParams = new ClientRpcParams {
+				Send = new ClientRpcSendParams {
+					TargetClientIds = new ulong[] { opponentId }
+				}
+			};
+			ReceiveCardClientRpc(-1, false, othersParams);
+		}
 	}
 
 	[ClientRpc]
@@ -114,11 +136,37 @@ public class PlayerNetwork : NetworkBehaviour {
 	}
 
 	[ClientRpc]
-	private void ReceiveCardClientRpc(int cardId, ClientRpcParams clientRpcParams = default) {
+	private void ReceiveCardClientRpc(int cardId, bool isMyCard, ClientRpcParams clientRpcParams = default) {
+		/*
 		if (cardId >= 60 && cardId <= 65 ) {
 			Debug.Log("Drew modifier card");
 		} else {
 			Debug.Log($"Drew spell ID: {cardId}");
 		}
+		*/
+		Transform targetZone = isMyCard ? playerHandZone : opponentHandZone;
+		if (targetZone == null) {
+			targetZone = GameObject.Find(isMyCard ? "PlayerHandZone" : "OpponentHandZone").transform;
+		}
+
+		GameObject newCard = Instantiate(cardPrefab, targetZone);
+		newCard.transform.SetParent(targetZone, false);
+
+		SpriteRenderer sr = newCard.GetComponent<SpriteRenderer>();
+    	if (sr == null) sr = newCard.GetComponentInChildren<SpriteRenderer>();
+		
+		if (isMyCard) {
+			newCard.GetComponent<CardVisual>().Initialize(cardId);
+		} else {
+			// Opponent's card: set to a hidden card visual
+			newCard.GetComponent<SpriteRenderer>().color = Color.red;
+		}
+	}
+
+	private ulong GetOpponentId(ulong drawerId) {
+		foreach (var clientId in NetworkManager.Singleton.ConnectedClientsIds) {
+			if (clientId != drawerId) return clientId;
+		}
+		return drawerId;
 	}
 }
