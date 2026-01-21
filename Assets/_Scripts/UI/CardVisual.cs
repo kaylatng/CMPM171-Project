@@ -9,10 +9,10 @@ public class CardVisual : MonoBehaviour
     public void Initialize(int id) {
         CardID = id;
         if (id >= 60) {
-            nameText.text = "Modifier";
+            // nameText.text = "Modifier";
             GetComponent<SpriteRenderer>().color = Color.yellow;
         } else {
-            nameText.text = "Spell " + id;
+            // nameText.text = "Spell " + id;
             GetComponent<SpriteRenderer>().color = Color.white;
         }
     }
