@@ -40,10 +40,13 @@ public class PlayerNetwork : NetworkBehaviour {
 	}
 
 	public override void OnNetworkSpawn() {
-		if (IsOwner) {
-			playerHandZone = GameObject.Find("PlayerHandZone").transform;
-			opponentHandZone = GameObject.Find("OpponentHandZone").transform;
-		}
+		
+		GameObject pZone = GameObject.Find("PlayerHandZone");
+		GameObject oZone = GameObject.Find("OpponentHandZone");
+
+		if (pZone != null) playerHandZone = pZone.transform;
+		if (oZone != null) opponentHandZone = oZone.transform;
+		
 		playerData.OnValueChanged += (PlayerData previousValue, PlayerData newValue) => {
 			Debug.Log(OwnerClientId + "; " + newValue.Health + "; " + newValue.IsReady + "; " + newValue.PlayerName + "; Cards in hand: " + newValue.CardsInHandCount);
 		};
@@ -95,6 +98,12 @@ public class PlayerNetwork : NetworkBehaviour {
 	private void RequestCardDrawServerRpc(ServerRpcParams serverRpcParams = default) {
 		Debug.Log("RequestCardDrawServerRpc " + OwnerClientId + "; " + serverRpcParams.Receive.SenderClientId);
 		var senderId = serverRpcParams.Receive.SenderClientId;
+		
+		if (playerData.Value.CardsInHandCount >= 5) {
+			Debug.Log("Hand is full. Must use action point to discard.");
+			return;
+		}
+		
 		int drawnCardId = DeckManager.Instance.DrawCard();
 
 		if (drawnCardId == -1) {
