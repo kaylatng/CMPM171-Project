@@ -52,7 +52,17 @@ public class PlayerNetwork : NetworkBehaviour {
 		};
 	}
 
-    private void Update() {
+	public bool IsPlayerReady() {
+		return playerData.Value.IsReady;
+	}
+
+	public void FinishTurn() {
+    if (!IsOwner) return;
+
+    SetReadyServerRpc(true);
+	}
+
+  private void Update() {
 		if (!IsOwner) return;
 
 		if (Keyboard.current.tKey.wasPressedThisFrame) {
@@ -98,6 +108,8 @@ public class PlayerNetwork : NetworkBehaviour {
 	private void RequestCardDrawServerRpc(ServerRpcParams serverRpcParams = default) {
 		Debug.Log("RequestCardDrawServerRpc " + OwnerClientId + "; " + serverRpcParams.Receive.SenderClientId);
 		var senderId = serverRpcParams.Receive.SenderClientId;
+
+		if (GameManager.Instance.CurrentPhase.Value != GameManager.GamePhase.Planning) return;
 		
 		if (playerData.Value.CardsInHandCount >= 5) {
 			Debug.Log("Hand is full. Must use action point to discard.");
@@ -132,6 +144,18 @@ public class PlayerNetwork : NetworkBehaviour {
 				}
 			};
 			ReceiveCardClientRpc(-1, false, othersParams);
+		}
+	}
+
+	[ServerRpc]
+	private void SetReadyServerRpc(bool readyStatus) {
+		PlayerData data = playerData.Value;
+		
+		data.IsReady = readyStatus;
+		playerData.Value = data;
+
+		if (GameManager.Instance != null) {
+			GameManager.Instance.CheckPlayersReadyServerRpc();
 		}
 	}
 
