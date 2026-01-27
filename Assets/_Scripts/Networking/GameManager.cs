@@ -13,6 +13,45 @@ public class GameManager : NetworkBehaviour {
     else Destroy(gameObject);
   }
 
+  public override void OnNetworkSpawn() {
+    if (IsServer) {
+      CurrentPhase.OnValueChanged += OnPhaseChanged;
+
+      if (CurrentPhase.Value == GamePhase.ResourceGain) {
+        StartCoroutine(ProcessResourceGain());
+      }
+    }
+  }
+
+  private void OnPhaseChanged(GamePhase oldPhase, GamePhase newPhase) {
+    if (!IsServer) return;
+    if (newPhase == GamePhase.ResourceGain) {
+      StartCoroutine(ProcessResourceGain());
+    }
+  }
+
+  private System.Collections.IEnumerator ProcessResourceGain() {
+    Debug.Log("GAME MANAGER || Resource Gain Phase - Waiting for players");
+    while (NetworkManager.Singleton.ConnectedClientsList.Count < 2) {
+        yield return new WaitForSeconds(0.5f);
+    }
+
+    Debug.Log("GAME MANAGER || Resource Gain Phase - Both players connected");
+    yield return new WaitForSeconds(0.5f);
+
+    // blind draw 1 card (automatic, 1 AP NOT used)
+    // and 1 mana charge given to player
+    foreach (var client in NetworkManager.Singleton.ConnectedClientsList) {
+      if (client.PlayerObject.TryGetComponent<PlayerNetwork>(out var player)) {
+        player.StartNewTurnServer(); // reset ap, add mana
+        player.ExecuteDrawServer(isFree: true);
+      }
+    }
+
+    yield return new WaitForSeconds(1.0f);
+    CurrentPhase.Value = GamePhase.Planning; // move to planning
+  }
+
  [ServerRpc]
   public void CheckPlayersReadyServerRpc() {
     if (!IsServer) return;
