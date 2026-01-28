@@ -6,8 +6,8 @@ using UnityEngine.InputSystem;
 public class PlayerNetwork : NetworkBehaviour {
 
 	[SerializeField] private GameObject cardPrefab;
-	[SerializeField] private Transform playerHandZone;
-	[SerializeField] private Transform opponentHandZone;
+	private Transform playerHandZone;
+	private Transform opponentHandZone;
 
 
 	private NetworkVariable<PlayerData> playerData = new NetworkVariable<PlayerData>(
@@ -46,6 +46,8 @@ public class PlayerNetwork : NetworkBehaviour {
 
 		if (pZone != null) playerHandZone = pZone.transform;
 		if (oZone != null) opponentHandZone = oZone.transform;
+
+		AssignHandZones();
 		
 		playerData.OnValueChanged += (PlayerData previousValue, PlayerData newValue) => {
 			Debug.Log(OwnerClientId + "; " + newValue.Health + "; " + newValue.IsReady + "; " + newValue.PlayerName + "; Cards in hand: " + newValue.CardsInHandCount);
@@ -123,6 +125,7 @@ public class PlayerNetwork : NetworkBehaviour {
 				TargetClientIds = new ulong[] { OwnerClientId }
 			}
     };
+		// Debug.Log("CardId Pulled: " + cardId);
     ReceiveCardClientRpc(cardId, true, drawerParams);
 
     ulong opponentId = GetOpponentId(OwnerClientId);
@@ -244,6 +247,15 @@ public class PlayerNetwork : NetworkBehaviour {
 			Debug.Log($"Drew spell ID: {cardId}");
 		}
 		*/
+		if (playerHandZone == null) {
+			GameObject pZone = GameObject.Find("PlayerHandZone");
+			if (pZone != null) playerHandZone = pZone.transform;
+    }
+    if (opponentHandZone == null) {
+			GameObject oZone = GameObject.Find("OpponentHandZone");
+			if (oZone != null) opponentHandZone = oZone.transform;
+    }
+
 		Transform targetZone = isMyCard ? playerHandZone : opponentHandZone;
 		if (targetZone == null) {
 			targetZone = GameObject.Find(isMyCard ? "PlayerHandZone" : "OpponentHandZone").transform;
@@ -256,6 +268,7 @@ public class PlayerNetwork : NetworkBehaviour {
     	if (sr == null) sr = newCard.GetComponentInChildren<SpriteRenderer>();
 		
 		if (isMyCard) {
+			// FIX THIS LINE
 			newCard.GetComponent<CardVisual>().Initialize(cardId);
 		} else {
 			// Opponent's card: set to a hidden card visual
@@ -268,5 +281,17 @@ public class PlayerNetwork : NetworkBehaviour {
 			if (clientId != drawerId) return clientId;
 		}
 		return drawerId;
+	}
+
+	private void AssignHandZones() {
+		if (playerHandZone == null) {
+			GameObject pZone = GameObject.Find("PlayerHandZone");
+			if (pZone != null) playerHandZone = pZone.transform;
+		}
+
+		if (opponentHandZone == null) {
+			GameObject oZone = GameObject.Find("OpponentHandZone");
+			if (oZone != null) opponentHandZone = oZone.transform;
+		}
 	}
 }
