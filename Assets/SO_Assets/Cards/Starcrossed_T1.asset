@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Starcrossed_T1
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   cardName: Starcrossed
-  cardID: 100
+  cardID: 600
   tier: 1
   isModifier: 0
   manaCost: 0

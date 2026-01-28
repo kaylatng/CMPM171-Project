@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9b707a296600ebf4e8ff345bfc36125d, type: 3}
   m_Name: SeeingDouble_D
   m_EditorClassIdentifier: Assembly-CSharp::CardData
-  cardName: Blindsighted
-  cardID: 100
+  cardName: Seeing Double
+  cardID: 1
   tier: 1
-  isModifier: 0
+  isModifier: 1
   manaCost: 0
   attackDamage: 0
   cardArt: {fileID: 0}

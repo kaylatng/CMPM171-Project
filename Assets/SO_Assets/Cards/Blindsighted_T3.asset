@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   cardName: Blindsighted
   cardID: 102
-  tier: 1
+  tier: 3
   isModifier: 0
   manaCost: 0
   attackDamage: 0

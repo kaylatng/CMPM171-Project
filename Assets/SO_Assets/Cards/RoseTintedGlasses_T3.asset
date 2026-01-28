@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: RoseTintedGlasses_T3
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   cardName: Rose Tinted Glasses
-  cardID: 102
-  tier: 1
+  cardID: 502
+  tier: 3
   isModifier: 0
   manaCost: 0
   attackDamage: 0

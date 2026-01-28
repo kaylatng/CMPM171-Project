@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: BurningPassion_T3
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   cardName: Burning Passion
-  cardID: 102
-  tier: 1
+  cardID: 202
+  tier: 3
   isModifier: 0
   manaCost: 0
   attackDamage: 0

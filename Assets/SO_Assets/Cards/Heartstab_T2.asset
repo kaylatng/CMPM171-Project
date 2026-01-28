@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: Heartstab_T2
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   cardName: Heartstab
-  cardID: 101
-  tier: 1
+  cardID: 301
+  tier: 2
   isModifier: 0
   manaCost: 0
   attackDamage: 0

@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: Lovestruck_T2
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   cardName: Lovestruck
-  cardID: 101
-  tier: 1
+  cardID: 401
+  tier: 2
   isModifier: 0
   manaCost: 0
   attackDamage: 0
