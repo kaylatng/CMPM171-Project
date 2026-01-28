@@ -39,7 +39,7 @@ public class DeckManager : MonoBehaviour
         for (int i = 60; i <= 65; i++) {
             masterDeck.Add(i);
         }
-        Debug.Log($"Deck Initialized: {masterDeck.Count} cards.");
+        Debug.Log($"DECK MANAGER || Deck Initialized: {masterDeck.Count} cards.");
     }
 
     public void Shuffle() {

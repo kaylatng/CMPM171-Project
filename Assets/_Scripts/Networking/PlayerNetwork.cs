@@ -6,8 +6,8 @@ using UnityEngine.InputSystem;
 public class PlayerNetwork : NetworkBehaviour {
 
 	[SerializeField] private GameObject cardPrefab;
-	[SerializeField] private Transform playerHandZone;
-	[SerializeField] private Transform opponentHandZone;
+	private Transform playerHandZone;
+	private Transform opponentHandZone;
 
 
 	private NetworkVariable<PlayerData> playerData = new NetworkVariable<PlayerData>(
@@ -46,13 +46,25 @@ public class PlayerNetwork : NetworkBehaviour {
 
 		if (pZone != null) playerHandZone = pZone.transform;
 		if (oZone != null) opponentHandZone = oZone.transform;
+
+		AssignHandZones();
 		
 		playerData.OnValueChanged += (PlayerData previousValue, PlayerData newValue) => {
 			Debug.Log(OwnerClientId + "; " + newValue.Health + "; " + newValue.IsReady + "; " + newValue.PlayerName + "; Cards in hand: " + newValue.CardsInHandCount);
 		};
 	}
 
-    private void Update() {
+	public bool IsPlayerReady() {
+		return playerData.Value.IsReady;
+	}
+
+	public void FinishTurn() {
+    if (!IsOwner) return;
+
+    SetReadyServerRpc(true);
+	}
+
+  private void Update() {
 		if (!IsOwner) return;
 
 		if (Keyboard.current.tKey.wasPressedThisFrame) {
@@ -79,6 +91,54 @@ public class PlayerNetwork : NetworkBehaviour {
 		}
 	}
 
+	public void StartNewTurnServer() {
+		if (!IsServer) return;
+		PlayerData data = playerData.Value;
+		data.ActionPoints = 5;
+		data.Mana += 1;
+		data.IsReady = false; // Reset ready status for new phase
+		playerData.Value = data;
+	}
+
+	// bypass the phase check for automatic draw
+	public void ExecuteDrawServer(bool isFree) {
+		if (!IsServer) return;
+
+		if (playerData.Value.CardsInHandCount >= 5) return;
+
+		int drawnCardId = DeckManager.Instance.DrawCard();
+		if (drawnCardId == -1) return;
+
+		PlayerData data = playerData.Value;
+		data.CardsInHandCount++;
+		if (!isFree) data.ActionPoints--; // only charge AP if it's a manual draw
+		playerData.Value = data;
+
+		SendDrawRpcs(drawnCardId);
+	}
+
+	private void SendDrawRpcs(int cardId) {
+		if (!IsServer) return;
+
+    ClientRpcParams drawerParams = new ClientRpcParams {
+			Send = new ClientRpcSendParams {
+				TargetClientIds = new ulong[] { OwnerClientId }
+			}
+    };
+		// Debug.Log("CardId Pulled: " + cardId);
+    ReceiveCardClientRpc(cardId, true, drawerParams);
+
+    ulong opponentId = GetOpponentId(OwnerClientId);
+    if (opponentId != OwnerClientId) {
+			ClientRpcParams othersParams = new ClientRpcParams {
+				Send = new ClientRpcSendParams {
+					TargetClientIds = new ulong[] { opponentId }
+				}
+			};
+			ReceiveCardClientRpc(-1, false, othersParams);
+		}
+	}
+
 	[ServerRpc]
 	private void UpdatePlayerStateServerRpc(ServerRpcParams serverRpcParams = default) {
 		Debug.Log("UpdatePlayerStateServerRpc " + OwnerClientId + "; " + serverRpcParams.Receive.SenderClientId);
@@ -95,9 +155,13 @@ public class PlayerNetwork : NetworkBehaviour {
 	}
 
 	[ServerRpc]
-	private void RequestCardDrawServerRpc(ServerRpcParams serverRpcParams = default) {
+	public void RequestCardDrawServerRpc(ServerRpcParams serverRpcParams = default) {
 		Debug.Log("RequestCardDrawServerRpc " + OwnerClientId + "; " + serverRpcParams.Receive.SenderClientId);
+		
+		/**
 		var senderId = serverRpcParams.Receive.SenderClientId;
+
+		if (GameManager.Instance.CurrentPhase.Value != GameManager.GamePhase.Planning) return;
 		
 		if (playerData.Value.CardsInHandCount >= 5) {
 			Debug.Log("Hand is full. Must use action point to discard.");
@@ -133,6 +197,36 @@ public class PlayerNetwork : NetworkBehaviour {
 			};
 			ReceiveCardClientRpc(-1, false, othersParams);
 		}
+		**/
+		// 1. phase check
+    if (GameManager.Instance.CurrentPhase.Value != GameManager.GamePhase.Planning) return;
+
+    // 2. ap check
+    if (playerData.Value.ActionPoints <= 0) {
+			Debug.Log("Not enough AP!");
+			return;
+    }
+
+    // 3. hand size check
+    if (playerData.Value.CardsInHandCount >= 5) {
+			Debug.Log("Hand full!");
+			return;
+    }
+
+    // execute (false means it's not a free draw)
+    ExecuteDrawServer(isFree: false);
+	}
+
+	[ServerRpc]
+	private void SetReadyServerRpc(bool readyStatus) {
+		PlayerData data = playerData.Value;
+		
+		data.IsReady = readyStatus;
+		playerData.Value = data;
+
+		if (GameManager.Instance != null) {
+			GameManager.Instance.CheckPlayersReadyServerRpc();
+		}
 	}
 
 	[ClientRpc]
@@ -153,6 +247,15 @@ public class PlayerNetwork : NetworkBehaviour {
 			Debug.Log($"Drew spell ID: {cardId}");
 		}
 		*/
+		if (playerHandZone == null) {
+			GameObject pZone = GameObject.Find("PlayerHandZone");
+			if (pZone != null) playerHandZone = pZone.transform;
+    }
+    if (opponentHandZone == null) {
+			GameObject oZone = GameObject.Find("OpponentHandZone");
+			if (oZone != null) opponentHandZone = oZone.transform;
+    }
+
 		Transform targetZone = isMyCard ? playerHandZone : opponentHandZone;
 		if (targetZone == null) {
 			targetZone = GameObject.Find(isMyCard ? "PlayerHandZone" : "OpponentHandZone").transform;
@@ -165,6 +268,7 @@ public class PlayerNetwork : NetworkBehaviour {
     	if (sr == null) sr = newCard.GetComponentInChildren<SpriteRenderer>();
 		
 		if (isMyCard) {
+			// FIX THIS LINE
 			newCard.GetComponent<CardVisual>().Initialize(cardId);
 		} else {
 			// Opponent's card: set to a hidden card visual
@@ -177,5 +281,17 @@ public class PlayerNetwork : NetworkBehaviour {
 			if (clientId != drawerId) return clientId;
 		}
 		return drawerId;
+	}
+
+	private void AssignHandZones() {
+		if (playerHandZone == null) {
+			GameObject pZone = GameObject.Find("PlayerHandZone");
+			if (pZone != null) playerHandZone = pZone.transform;
+		}
+
+		if (opponentHandZone == null) {
+			GameObject oZone = GameObject.Find("OpponentHandZone");
+			if (oZone != null) opponentHandZone = oZone.transform;
+		}
 	}
 }

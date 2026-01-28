@@ -12,5 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6d41c5741b7ac014f9ad6b92d9c5da48, type: 3}
   m_Name: CardLibrary
   m_EditorClassIdentifier: Assembly-CSharp::CardLibrary
-  allCards: []
+  allCards:
+  - {fileID: 11400000, guid: 788a07d8a23805e4aa62d74bbce3e12f, type: 2}
+  - {fileID: 11400000, guid: b895feae36f45694c86ed8ca0c902fe2, type: 2}
+  - {fileID: 11400000, guid: 5cac0a98d36dfc348a0f14068ea499e9, type: 2}
+  - {fileID: 11400000, guid: 30f43da50ddabf048ae6c32045637124, type: 2}
+  - {fileID: 11400000, guid: 10d28118ea8adff4eab9ea572ac880d2, type: 2}
+  - {fileID: 11400000, guid: 9ed69a964f6411e4484e1552d3b060dc, type: 2}
+  - {fileID: 11400000, guid: 7112083f25321f046a66ad42daa4a10c, type: 2}
   cardBack: {fileID: 0}
