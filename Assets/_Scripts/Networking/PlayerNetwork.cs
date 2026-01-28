@@ -155,7 +155,7 @@ public class PlayerNetwork : NetworkBehaviour {
 	}
 
 	[ServerRpc]
-	private void RequestCardDrawServerRpc(ServerRpcParams serverRpcParams = default) {
+	public void RequestCardDrawServerRpc(ServerRpcParams serverRpcParams = default) {
 		Debug.Log("RequestCardDrawServerRpc " + OwnerClientId + "; " + serverRpcParams.Receive.SenderClientId);
 		
 		/**
