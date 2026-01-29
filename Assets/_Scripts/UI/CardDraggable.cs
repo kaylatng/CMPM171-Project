@@ -249,7 +249,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         // card data
         if (CardManager.Instance != null && CardManager.Instance.GetCardLibrary() != null)
         {
-            CardData cardData = CardManager.Instance.GetCardLibrary().GetCardByID(cardVisual.CardID);
+            CardData cardData = CardManager.Instance.GetCardLibrary().GetTierOneAssetFromPool(cardVisual.CardID);
             if (cardData == null) return false;
 
             // check player has enough mana

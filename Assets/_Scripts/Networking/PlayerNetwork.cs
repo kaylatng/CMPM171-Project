@@ -98,10 +98,15 @@ public class PlayerNetwork : NetworkBehaviour {
 		// 	Debug.Log(OwnerClientId + "; " + newValue.Health + "; " + newValue.IsReady + "; " + newValue.PlayerName + "; Cards in hand: " + newValue.HandCardIds);
 		// };
 		playerData.OnValueChanged += (PlayerData previousValue, PlayerData newValue) => {
-
 			string idListString = "";
+			CardLibrary library = CardManager.Instance.GetCardLibrary();
+
 			for (int i = 0; i < newValue.HandCardIds.Length; i++) {
+				int poolId = newValue.HandCardIds[i];
+				int assetId = library.GetMappedAssetID(poolId);
+
         idListString += newValue.HandCardIds[i].ToString();
+				idListString += $" (Asset ID: {assetId})";
         
         if (i < newValue.HandCardIds.Length - 1) {
             idListString += ", ";
