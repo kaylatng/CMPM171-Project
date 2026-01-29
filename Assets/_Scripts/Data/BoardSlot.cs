@@ -17,7 +17,25 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
     private bool isHovered;
 
     public int SlotIndex => slotIndex;
-    public bool IsPlayerSlot => isPlayerSlot;
+
+    public bool IsPlayerSlot 
+    { 
+        get 
+        {
+            // check parent zone name - if it's "PlayerBoardZone", it belongs to the local player
+            if (transform.parent != null)
+            {
+                bool isLocalPlayerSlot = transform.parent.name == "PlayerBoardZone";
+                if (isLocalPlayerSlot != isPlayerSlot)
+                {
+                    Debug.Log($"BOARD SLOT || Slot {name} - Serialized isPlayerSlot: {isPlayerSlot}, Actual (by zone): {isLocalPlayerSlot}");
+                }
+                return isLocalPlayerSlot;
+            }
+            return isPlayerSlot;
+        }
+    }
+
     public bool IsOccupied => occupyingCard != null;
     public GameObject OccupyingCard => occupyingCard;
 

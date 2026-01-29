@@ -102,7 +102,11 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     public void OnBeginDrag(PointerEventData eventData)
     {   
-        if (!IsPlayerCard()) return;
+        if (!IsPlayerCard()) 
+        {
+            Debug.Log($"CARD DRAGGABLE || Drag blocked - not a player card. Parent: {transform.parent?.name}");
+            return;
+        }
 
         // deselect if selected
         if (isSelected)
@@ -135,6 +139,12 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     public void OnEndDrag(PointerEventData eventData)
     {
+        if (!isDragging)
+        {
+            Debug.Log($"CARD DRAGGABLE || OnEndDrag called but isDragging is false");
+            return;
+        }
+        
         isDragging = false;
 
         if (spriteRenderer != null)
@@ -296,20 +306,36 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     private bool IsPlayerCard()
     {
+        // check if this component is even enabled (opponent cards have this disabled)
+        if (!enabled)
+        {
+            Debug.Log($"CARD DRAGGABLE || IsPlayerCard check - component is disabled");
+            return false;
+        }
+
         Transform parent = transform.parent;
         if (parent != null)
         {
+            // check if in player hand zone
             if (parent.name == "PlayerHandZone")
             {
+                Debug.Log($"CARD DRAGGABLE || IsPlayerCard check - in PlayerHandZone: TRUE");
                 return true;
             }
             
-            // Check if parent is a player slot
+            // check if parent is a player slot
             BoardSlot slot = parent.GetComponent<BoardSlot>();
             if (slot != null)
             {
+                Debug.Log($"CARD DRAGGABLE || IsPlayerCard check - in BoardSlot, IsPlayerSlot: {slot.IsPlayerSlot}");
                 return slot.IsPlayerSlot;
             }
+
+            Debug.Log($"CARD DRAGGABLE || IsPlayerCard check - parent is '{parent.name}': FALSE");
+        }
+        else
+        {
+            Debug.Log($"CARD DRAGGABLE || IsPlayerCard check - no parent: FALSE");
         }
         
         return false;
