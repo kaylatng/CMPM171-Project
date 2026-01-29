@@ -7,9 +7,12 @@ public class CardLibrary : ScriptableObject
   public List<CardData> allCards = new List<CardData>();
   public Sprite cardBack;
 
-  // FUNCTION TO BE IMPLEMENTED
   public CardData GetCardByID(int id){
-    // return ID if within bounds of allCards.Count
-    return null; // remove this
+    foreach (CardData card in allCards) {
+      if (card != null && card.cardID == id) {
+        return card;
+      }
+    }
+    return null;
   }
 }

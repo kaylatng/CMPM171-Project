@@ -28,6 +28,11 @@ public class PlayerNetwork : NetworkBehaviour {
 		public bool IsReady;
 		public int CardsInHandCount;
 		public FixedString128Bytes PlayerName;
+		public FixedList32Bytes<int> HandCardIds;
+
+	public void UpdateHandCount() {
+		CardsInHandCount = HandCardIds.Length;
+	}
 
 		public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter {
 			serializer.SerializeValue(ref Health);
@@ -36,6 +41,24 @@ public class PlayerNetwork : NetworkBehaviour {
 			serializer.SerializeValue(ref IsReady);
 			serializer.SerializeValue(ref CardsInHandCount);
 			serializer.SerializeValue(ref PlayerName);
+			
+				if (serializer.IsReader) {
+					int count = 0;
+					serializer.SerializeValue(ref count);
+					HandCardIds.Clear();
+					for (int i = 0; i < count; i++) {
+						int cardId = 0;
+						serializer.SerializeValue(ref cardId);
+						HandCardIds.Add(cardId);
+					}
+				} else {
+					int count = HandCardIds.Length;
+					serializer.SerializeValue(ref count);
+					for (int i = 0; i < HandCardIds.Length; i++) {
+						int cardId = HandCardIds[i];
+						serializer.SerializeValue(ref cardId);
+					}
+				}
 		}
 	}
 
@@ -49,9 +72,21 @@ public class PlayerNetwork : NetworkBehaviour {
 
 		AssignHandZones();
 		
+		// playerData.OnValueChanged += (PlayerData previousValue, PlayerData newValue) => {
+		// 	Debug.Log(OwnerClientId + "; " + newValue.Health + "; " + newValue.IsReady + "; " + newValue.PlayerName + "; Cards in hand: " + newValue.HandCardIds);
+		// };
 		playerData.OnValueChanged += (PlayerData previousValue, PlayerData newValue) => {
-			Debug.Log(OwnerClientId + "; " + newValue.Health + "; " + newValue.IsReady + "; " + newValue.PlayerName + "; Cards in hand: " + newValue.CardsInHandCount);
-		};
+
+			string idListString = "";
+			for (int i = 0; i < newValue.HandCardIds.Length; i++) {
+        idListString += newValue.HandCardIds[i].ToString();
+        
+        if (i < newValue.HandCardIds.Length - 1) {
+            idListString += ", ";
+        }
+    }
+			Debug.Log($"Player {OwnerClientId} | HP: {newValue.Health} | Hand Count: {newValue.CardsInHandCount} | IDs: [{idListString}]");
+    };
 	}
 
 	public bool IsPlayerReady() {
@@ -110,7 +145,11 @@ public class PlayerNetwork : NetworkBehaviour {
 		if (drawnCardId == -1) return;
 
 		PlayerData data = playerData.Value;
-		data.CardsInHandCount++;
+		
+		data.HandCardIds.Add(drawnCardId);
+		data.UpdateHandCount();
+		// data.CardsInHandCount++;
+
 		if (!isFree) data.ActionPoints--; // only charge AP if it's a manual draw
 		playerData.Value = data;
 
@@ -226,6 +265,19 @@ public class PlayerNetwork : NetworkBehaviour {
 
 		if (GameManager.Instance != null) {
 			GameManager.Instance.CheckPlayersReadyServerRpc();
+		}
+	}
+
+	[ServerRpc]
+	public void RemoveCardFromHandServerRpc(int cardId) {
+		PlayerData data = playerData.Value;
+
+		if (data.HandCardIds.Contains(cardId)) {
+			data.HandCardIds.Remove(cardId);
+			data.UpdateHandCount();
+			playerData.Value = data;
+
+			Debug.Log($"Server: Removed card {cardId} from Player {OwnerClientId}'s hand");
 		}
 	}
 
