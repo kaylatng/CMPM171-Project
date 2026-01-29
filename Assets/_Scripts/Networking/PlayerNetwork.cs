@@ -5,9 +5,9 @@ using UnityEngine.InputSystem;
 
 public class PlayerNetwork : NetworkBehaviour {
 
-	[SerializeField] private GameObject cardPrefab;
-	private Transform playerHandZone;
-	private Transform opponentHandZone;
+	// [SerializeField] private GameObject cardPrefab;
+	// private Transform playerHandZone;
+	// private Transform opponentHandZone;
 
 
 	private NetworkVariable<PlayerData> playerData = new NetworkVariable<PlayerData>(
@@ -30,9 +30,9 @@ public class PlayerNetwork : NetworkBehaviour {
 		public FixedString128Bytes PlayerName;
 		public FixedList32Bytes<int> HandCardIds;
 
-	public void UpdateHandCount() {
-		CardsInHandCount = HandCardIds.Length;
-	}
+		public void UpdateHandCount() {
+			CardsInHandCount = HandCardIds.Length;
+		}
 
 		public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter {
 			serializer.SerializeValue(ref Health);
@@ -63,7 +63,7 @@ public class PlayerNetwork : NetworkBehaviour {
 	}
 
 	public override void OnNetworkSpawn() {
-		
+		/*
 		GameObject pZone = GameObject.Find("PlayerHandZone");
 		GameObject oZone = GameObject.Find("OpponentHandZone");
 
@@ -71,6 +71,7 @@ public class PlayerNetwork : NetworkBehaviour {
 		if (oZone != null) opponentHandZone = oZone.transform;
 
 		AssignHandZones();
+		*/
 		
 		// playerData.OnValueChanged += (PlayerData previousValue, PlayerData newValue) => {
 		// 	Debug.Log(OwnerClientId + "; " + newValue.Health + "; " + newValue.IsReady + "; " + newValue.PlayerName + "; Cards in hand: " + newValue.HandCardIds);
@@ -299,6 +300,9 @@ public class PlayerNetwork : NetworkBehaviour {
 			Debug.Log($"Drew spell ID: {cardId}");
 		}
 		*/
+
+		// MOVED TO CardManager
+		/*
 		if (playerHandZone == null) {
 			GameObject pZone = GameObject.Find("PlayerHandZone");
 			if (pZone != null) playerHandZone = pZone.transform;
@@ -320,11 +324,17 @@ public class PlayerNetwork : NetworkBehaviour {
     	if (sr == null) sr = newCard.GetComponentInChildren<SpriteRenderer>();
 		
 		if (isMyCard) {
-			// FIX THIS LINE
 			newCard.GetComponent<CardVisual>().Initialize(cardId);
 		} else {
 			// Opponent's card: set to a hidden card visual
 			newCard.GetComponent<SpriteRenderer>().color = Color.red;
+		}
+		*/
+
+		if (CardManager.Instance != null) {
+			CardManager.Instance.SpawnCard(cardId, isMyCard);
+		} else {
+			Debug.LogError("PLAYER NETWORK || CardManager.Instance is null - cannot spawn card visual");
 		}
 	}
 
@@ -335,15 +345,15 @@ public class PlayerNetwork : NetworkBehaviour {
 		return drawerId;
 	}
 
-	private void AssignHandZones() {
-		if (playerHandZone == null) {
-			GameObject pZone = GameObject.Find("PlayerHandZone");
-			if (pZone != null) playerHandZone = pZone.transform;
-		}
+	// private void AssignHandZones() {
+	// 	if (playerHandZone == null) {
+	// 		GameObject pZone = GameObject.Find("PlayerHandZone");
+	// 		if (pZone != null) playerHandZone = pZone.transform;
+	// 	}
 
-		if (opponentHandZone == null) {
-			GameObject oZone = GameObject.Find("OpponentHandZone");
-			if (oZone != null) opponentHandZone = oZone.transform;
-		}
-	}
+	// 	if (opponentHandZone == null) {
+	// 		GameObject oZone = GameObject.Find("OpponentHandZone");
+	// 		if (oZone != null) opponentHandZone = oZone.transform;
+	// 	}
+	// }
 }

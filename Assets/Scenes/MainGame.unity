@@ -351,18 +351,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 5805246421837507632, guid: 371d47d3cf7bbb849b1052a0baa0dc47, type: 3}
-      propertyPath: hoverColor.b
-      value: 0.89433956
-      objectReference: {fileID: 0}
-    - target: {fileID: 5805246421837507632, guid: 371d47d3cf7bbb849b1052a0baa0dc47, type: 3}
-      propertyPath: hoverColor.g
-      value: 0.261552
-      objectReference: {fileID: 0}
-    - target: {fileID: 5805246421837507632, guid: 371d47d3cf7bbb849b1052a0baa0dc47, type: 3}
-      propertyPath: hoverColor.r
-      value: 0.5644823
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -576,6 +564,52 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   m_MaxRayIntersections: 0
+--- !u!1 &542812195
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 542812197}
+  - component: {fileID: 542812196}
+  m_Layer: 0
+  m_Name: CardManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &542812196
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 542812195}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76569b0e439df4a63867b6d26d6b7b81, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CardManager
+  cardLibrary: {fileID: 11400000, guid: d6c28565e4e0aef44a1c70044750072c, type: 2}
+  cardPrefab: {fileID: 3401543228492905270, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
+--- !u!4 &542812197
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 542812195}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 216.52232, y: 169.51231, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &543411596
 GameObject:
   m_ObjectHideFlags: 0
@@ -2328,6 +2362,7 @@ SceneRoots:
   - {fileID: 1029056904}
   - {fileID: 727714811}
   - {fileID: 402574549}
+  - {fileID: 542812197}
   - {fileID: 543411597}
   - {fileID: 1660150826}
   - {fileID: 1501947292}
