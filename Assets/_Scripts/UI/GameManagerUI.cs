@@ -25,14 +25,16 @@ public class GameManagerUI : MonoBehaviour {
 	}
 	
 	private void Update() {
-		if (localPlayer == null && NetworkManager.Singleton.IsClient) {
+		if (localPlayer != null) return;
+		if(NetworkManager.Singleton == null) return;
+		if(!NetworkManager.Singleton.IsClient) return;
+
 			var localClient = NetworkManager.Singleton.LocalClient;
 			if (localClient != null && localClient.PlayerObject != null) {
 				localPlayer = localClient.PlayerObject.GetComponent<PlayerNetwork>();
 			}
 		}
-	}
-
+		
 	private void OnPhaseChanged(GameManager.GamePhase oldPhase, GameManager.GamePhase newPhase) {
 		phaseText.text = $"Phase: {newPhase}";
 

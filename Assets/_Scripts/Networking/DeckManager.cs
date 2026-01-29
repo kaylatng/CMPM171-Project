@@ -15,37 +15,58 @@ public class DeckManager : MonoBehaviour
         Shuffle();
     }
     
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         
     }
 
-    // Update is called once per frame
     void Update()
     {
         
     }
 
-    private void GenerateInitialDeck() {
-        masterDeck.Clear();
+    //TEMPORARILY COMMDENTED OUT FOR SMALLER SCOPE CARDLOGIC TESTING, will uncomment to implement 66 cards 
+
+   // private void GenerateInitialDeck() {
+       // masterDeck.Clear();
 
         // add 60 spell cards (ID: 0-59)
-        for (int i = 0; i < 60; i++) {
-            masterDeck.Add(i);
-        }
+       // for (int i = 0; i < 60; i++) {
+        //    masterDeck.Add(i);
+       // }
 
         // add 6 modifier spell cards (ID: 60-65)
-        for (int i = 60; i <= 65; i++) {
-            masterDeck.Add(i);
-        }
-        Debug.Log($"DECK MANAGER || Deck Initialized: {masterDeck.Count} cards.");
-    }
+       // for (int i = 60; i <= 65; i++) {
+          //  masterDeck.Add(i);
+       // }
+       // Debug.Log($"DECK MANAGER || Deck Initialized: {masterDeck.Count} cards.");
+    //}
 
-    public void Shuffle() {
-        for (int i = 0; i < masterDeck.Count; i++) {
+   private void GenerateInitialDeck()
+   {
+        masterDeck.Clear();
+
+        if (CardManager.Instance == null || CardManager.Instance.cardLibrary == null)
+        {
+            Debug.LogError("DECK MANAGER || Missing CardLibrary.");
+            return;
+        }
+
+        foreach (CardData card in CardManager.Instance.cardLibrary.allCards)
+        {
+            if (card == null) continue;
+            masterDeck.Add(card.cardID);
+        }
+
+        Debug.Log($"DECK MANAGER || Deck Initialized: {masterDeck.Count} cards.");
+   }
+
+    public void Shuffle()
+    {
+        for (int i = 0; i < masterDeck.Count; i++)
+        {
             int temp = masterDeck[i];
-            int randomIndex = Random.Range(i,masterDeck.Count);
+            int randomIndex = Random.Range(i, masterDeck.Count);
             masterDeck[i] = masterDeck[randomIndex];
             masterDeck[randomIndex] = temp;
         }
