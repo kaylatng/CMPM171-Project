@@ -91,6 +91,27 @@ public class CardManager : MonoBehaviour
         return newCard;
     }
 
+    // spawn a card directly at a specific parent (e.g., a board slot)
+    public GameObject SpawnCardAtParent(int cardId, bool revealCard, Transform parent)
+    {
+        if (parent == null)
+        {
+            Debug.LogError("CARD MANAGER || Cannot spawn card - parent is null!");
+            return null;
+        }
+
+        GameObject newCard = Instantiate(cardPrefab, parent);
+        newCard.transform.SetParent(parent, false);
+        newCard.transform.localPosition = Vector3.zero;
+        newCard.transform.localRotation = Quaternion.identity;
+        newCard.transform.localScale = Vector3.one;
+
+        InitializeCardVisual(newCard, cardId, revealCard);
+
+        Debug.Log($"CARD MANAGER || Spawned card {cardId} directly at parent {parent.name}");
+        return newCard;
+    }
+
     private void ArrangeCardsInHand(Transform handZone)
     {
         if (handZone == null) return;
@@ -231,6 +252,26 @@ public class CardManager : MonoBehaviour
         }
     }
 
+    // remove one card from opponent hand (used when they play a card)
+    public void RemoveOneOpponentHandCard()
+    {
+        if (opponentHandZone == null)
+        {
+            AssignHandZones();
+        }
+
+        if (opponentHandZone != null && opponentHandZone.childCount > 0)
+        {
+            GameObject cardToRemove = opponentHandZone.GetChild(0).gameObject;
+            Debug.Log($"CARD MANAGER || Removing one card from opponent hand");
+            RemoveCardFromZone(cardToRemove);
+        }
+        else
+        {
+            Debug.LogWarning("CARD MANAGER || Tried to remove card from empty opponent hand");
+        }
+    }
+
     public void ClearHandZone(bool isPlayerZone)
     {
         Transform targetZone = isPlayerZone ? playerHandZone : opponentHandZone;
@@ -254,6 +295,11 @@ public class CardManager : MonoBehaviour
     public CardLibrary GetCardLibrary()
     {
         return cardLibrary;
+    }
+
+    public GameObject GetCardPrefab()
+    {
+        return cardPrefab;
     }
 
     public void RevealOpponentCard(GameObject cardObject, int cardId)

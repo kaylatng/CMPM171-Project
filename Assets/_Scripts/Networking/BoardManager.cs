@@ -285,21 +285,40 @@ public class BoardManager : MonoBehaviour
         BoardSlot targetSlot = opponentSlots[slotIndex];
         if (targetSlot == null) return;
 
-        if (CardManager.Instance != null)
+        if (CardManager.Instance == null) return;
+
+        // STEP 1: remove one card from opponent hand (since they played it)
+        CardManager.Instance.RemoveOneOpponentHandCard();
+
+        // STEP 2: clear the slot if already occupied (swap scenario)
+        if (targetSlot.IsOccupied)
         {
-            GameObject card = CardManager.Instance.SpawnCard(cardId, false);
-            if (card != null)
-            {
-                CardDraggable draggable = card.GetComponent<CardDraggable>();
-                if (draggable != null)
-                {
-                    draggable.enabled = false;
-                }
-                targetSlot.PlaceCard(card);
-            }
+            Debug.Log($"BOARD MANAGER || Slot {slotIndex} already occupied, clearing it first");
+            targetSlot.ClearSlot();
         }
 
-        Debug.Log($"BOARD MANAGER || Opponent placed card {cardId} in slot {slotIndex}");
+        // STEP 3: create the card object
+        GameObject card = Instantiate(CardManager.Instance.GetCardPrefab());
+        if (card != null)
+        {
+            // initialize it as a revealed opponent card
+            CardManager.Instance.InitializeCardVisual(card, cardId, true);
+            
+            CardDraggable draggable = card.GetComponent<CardDraggable>();
+            if (draggable != null)
+            {
+                draggable.enabled = false;
+            }
+            
+            // place it in the slot using the normal flow
+            targetSlot.PlaceCard(card);
+            
+            Debug.Log($"BOARD MANAGER || Opponent placed card {cardId} in slot {slotIndex}");
+        }
+        else
+        {
+            Debug.LogError($"BOARD MANAGER || Failed to instantiate card prefab");
+        }
     }
 
     public BoardSlot GetSlot(int slotIndex, bool isPlayerSlot)
