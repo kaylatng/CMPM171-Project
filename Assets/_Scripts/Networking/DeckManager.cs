@@ -5,6 +5,8 @@ public class DeckManager : MonoBehaviour
 {
     public static DeckManager Instance;
 
+    public CardLibrary cardLibrary;
+
     private List<int> masterDeck = new List<int>();
 
     private void Awake() {
@@ -14,18 +16,6 @@ public class DeckManager : MonoBehaviour
         GenerateInitialDeck();
         Shuffle();
     }
-    
-    void Start()
-    {
-        
-    }
-
-    void Update()
-    {
-        
-    }
-
-    //TEMPORARILY COMMDENTED OUT FOR SMALLER SCOPE CARDLOGIC TESTING, will uncomment to implement 66 cards 
 
    // private void GenerateInitialDeck() {
        // masterDeck.Clear();
@@ -43,30 +33,28 @@ public class DeckManager : MonoBehaviour
     //}
 
    private void GenerateInitialDeck()
-   {
-        masterDeck.Clear();
+{
+    masterDeck.Clear();
 
-        if (CardManager.Instance == null || CardManager.Instance.cardLibrary == null)
-        {
-            Debug.LogError("DECK MANAGER || Missing CardLibrary.");
-            return;
-        }
-
-        foreach (CardData card in CardManager.Instance.cardLibrary.allCards)
-        {
-            if (card == null) continue;
-            masterDeck.Add(card.cardID);
-        }
-
-        Debug.Log($"DECK MANAGER || Deck Initialized: {masterDeck.Count} cards.");
-   }
-
-    public void Shuffle()
+    if (cardLibrary == null)
     {
-        for (int i = 0; i < masterDeck.Count; i++)
-        {
+        Debug.LogError("DECK MANAGER || Missing CardLibrary.");
+        return;
+    }
+
+    foreach (CardData card in cardLibrary.allCards)
+    {
+        if (card == null) continue;
+        masterDeck.Add(card.cardID);
+    }
+
+    Debug.Log($"DECK MANAGER || Deck Initialized: {masterDeck.Count} cards.");
+}
+
+    public void Shuffle() {
+        for (int i = 0; i < masterDeck.Count; i++) {
             int temp = masterDeck[i];
-            int randomIndex = Random.Range(i, masterDeck.Count);
+            int randomIndex = Random.Range(i,masterDeck.Count);
             masterDeck[i] = masterDeck[randomIndex];
             masterDeck[randomIndex] = temp;
         }

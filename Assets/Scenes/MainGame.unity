@@ -284,6 +284,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 579428071da94aa4e8df88cd0c8b2b29, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DeckManager
+  cardLibrary: {fileID: 11400000, guid: d6c28565e4e0aef44a1c70044750072c, type: 2}
 --- !u!4 &402574549
 Transform:
   m_ObjectHideFlags: 0
