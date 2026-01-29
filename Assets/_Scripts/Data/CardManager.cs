@@ -13,6 +13,12 @@ public class CardManager : MonoBehaviour
     private Transform playerHandZone;
     private Transform opponentHandZone;
 
+    [Header("Card Layout Settings")]
+    [SerializeField] private float cardSpacing = 1.5f;
+    [SerializeField] private float cardArcHeight = 0.5f; // arc WIP
+    [SerializeField] private float cardRotationAngle = 5f;
+
+
     private void Awake()
     {
         if (Instance == null) Instance = this;
@@ -79,8 +85,45 @@ public class CardManager : MonoBehaviour
 
         InitializeCardVisual(newCard, cardId, isPlayerCard);
 
+        ArrangeCardsInHand(targetZone);
+
         Debug.Log($"CARD MANAGER || Spawned card {cardId} in {(isPlayerCard ? "player" : "opponent")} hand");
         return newCard;
+    }
+
+    private void ArrangeCardsInHand(Transform handZone)
+    {
+        if (handZone == null) return;
+
+        int cardCount = handZone.childCount;
+        if (cardCount == 0) return;
+
+        float totalWidth = (cardCount - 1) * cardSpacing;
+        float startX = -totalWidth / 2f;
+
+        for (int i = 0; i < cardCount; i++)
+        {
+            Transform card = handZone.GetChild(i);
+            
+            float normalizedPosition = cardCount > 1 ? (float)i / (cardCount - 1) : 0.5f;
+            float xPos = startX + (i * cardSpacing);
+            
+            // create arc effect
+            float yPos = -cardArcHeight * 4f * (normalizedPosition - 0.5f) * (normalizedPosition - 0.5f) + cardArcHeight;
+            
+            card.localPosition = new Vector3(xPos, yPos, 0);
+            
+            // create fan rotation effect
+            float rotationZ = Mathf.Lerp(cardRotationAngle, -cardRotationAngle, normalizedPosition);
+            card.localRotation = Quaternion.Euler(0, 0, rotationZ);
+            
+            // Optional: Set sorting order based on position (leftmost cards behind)
+            SpriteRenderer spriteRenderer = card.GetComponent<SpriteRenderer>();
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.sortingOrder = i;
+            }
+        }
     }
 
     public void InitializeCardVisual(GameObject cardObject, int cardId, bool revealCard)
@@ -131,7 +174,7 @@ public class CardManager : MonoBehaviour
                 else
                 {
                     // fallback: use red color for hidden cards
-                    spriteRenderer.color = Color.red;
+                    spriteRenderer.color = Color.white; // change to red for code testing
                 }
             }
 
@@ -139,6 +182,12 @@ public class CardManager : MonoBehaviour
             if (cardVisual != null)
             {
                 cardVisual.CardID = -1;
+            }
+
+            CardDraggable draggable = cardObject.GetComponent<CardDraggable>();
+            if (draggable != null)
+            {
+                draggable.enabled = false;
             }
         }
     }
@@ -151,11 +200,34 @@ public class CardManager : MonoBehaviour
         return;
     }
 
+    public void RemoveCardFromHand(GameObject cardObject)
+    {
+        if (cardObject == null) return;
+        
+        Transform parent = cardObject.transform.parent;
+        
+        // deparent it - don't destroy
+        cardObject.transform.SetParent(null);
+        
+        // rearrange remaining cards in hand
+        if (parent != null && (parent == playerHandZone || parent == opponentHandZone))
+        {
+            ArrangeCardsInHand(parent);
+        }
+    }
+
     public void RemoveCardFromZone(GameObject cardObject)
     {
         if (cardObject != null)
         {
+            Transform parent = cardObject.transform.parent;
             Destroy(cardObject);
+            
+            // rearrange remaining cards after removal
+            if (parent != null)
+            {
+                ArrangeCardsInHand(parent);
+            }
         }
     }
 
@@ -177,6 +249,11 @@ public class CardManager : MonoBehaviour
     {
         Transform targetZone = isPlayerZone ? playerHandZone : opponentHandZone;
         return targetZone != null ? targetZone.childCount : 0;
+    }
+
+    public CardLibrary GetCardLibrary()
+    {
+        return cardLibrary;
     }
 
     public void RevealOpponentCard(GameObject cardObject, int cardId)

@@ -29,6 +29,7 @@ public class PlayerNetwork : NetworkBehaviour {
 		public int CardsInHandCount;
 		public FixedString128Bytes PlayerName;
 		public FixedList32Bytes<int> HandCardIds;
+		public FixedList32Bytes<int> BoardCardIds;
 
 		public void UpdateHandCount() {
 			CardsInHandCount = HandCardIds.Length;
@@ -42,23 +43,43 @@ public class PlayerNetwork : NetworkBehaviour {
 			serializer.SerializeValue(ref CardsInHandCount);
 			serializer.SerializeValue(ref PlayerName);
 			
-				if (serializer.IsReader) {
-					int count = 0;
-					serializer.SerializeValue(ref count);
-					HandCardIds.Clear();
-					for (int i = 0; i < count; i++) {
-						int cardId = 0;
-						serializer.SerializeValue(ref cardId);
-						HandCardIds.Add(cardId);
-					}
-				} else {
-					int count = HandCardIds.Length;
-					serializer.SerializeValue(ref count);
-					for (int i = 0; i < HandCardIds.Length; i++) {
-						int cardId = HandCardIds[i];
-						serializer.SerializeValue(ref cardId);
-					}
+			// serialize hand cards
+			if (serializer.IsReader) {
+				int count = 0;
+				serializer.SerializeValue(ref count);
+				HandCardIds.Clear();
+				for (int i = 0; i < count; i++) {
+					int cardId = 0;
+					serializer.SerializeValue(ref cardId);
+					HandCardIds.Add(cardId);
 				}
+			} else {
+				int count = HandCardIds.Length;
+				serializer.SerializeValue(ref count);
+				for (int i = 0; i < HandCardIds.Length; i++) {
+					int cardId = HandCardIds[i];
+					serializer.SerializeValue(ref cardId);
+				}
+			}
+
+			// serialize BoardCardIds
+			if (serializer.IsReader) {
+				int boardCount = 0;
+				serializer.SerializeValue(ref boardCount);
+				BoardCardIds.Clear();
+				for (int i = 0; i < boardCount; i++) {
+					int cardId = 0;
+					serializer.SerializeValue(ref cardId);
+					BoardCardIds.Add(cardId);
+				}
+			} else {
+				int boardCount = BoardCardIds.Length;
+				serializer.SerializeValue(ref boardCount);
+				for (int i = 0; i < BoardCardIds.Length; i++) {
+					int cardId = BoardCardIds[i];
+					serializer.SerializeValue(ref cardId);
+				}
+			}
 		}
 	}
 
@@ -282,6 +303,122 @@ public class PlayerNetwork : NetworkBehaviour {
 		}
 	}
 
+	[ServerRpc]
+	public void PlayCardToSlotServerRpc(int cardId, int slotIndex, ServerRpcParams serverRpcParams = default) {
+		if (!IsServer) return;
+
+		Debug.Log($"PLAYER NETWORK || ServerRpc received: Card {cardId} to slot {slotIndex}");
+
+		if (GameManager.Instance.CurrentPhase.Value != GameManager.GamePhase.Planning) {
+			Debug.Log("PLAYER NETWORK || Cannot play card - not in Planning phase");
+			return;
+		}
+
+		PlayerData data = playerData.Value;
+		string handCards = "";
+    for (int i = 0; i < data.HandCardIds.Length; i++)
+    {
+        handCards += data.HandCardIds[i] + ", ";
+    }
+    Debug.Log($"PLAYER NETWORK || Current hand: [{handCards}]");
+
+		if (!data.HandCardIds.Contains(cardId)) {
+			Debug.Log($"PLAYER NETWORK || Card {cardId} not in player's hand");
+			return;
+		}
+
+		/*
+		CardLibrary library = CardManager.Instance?.GetCardLibrary();
+		if (library != null) {
+			CardData cardData = library.GetCardByID(cardId);
+			if (cardData != null) {
+				// check mana cost
+				if (data.Mana < cardData.manaCost) {
+					Debug.Log($"PLAYER NETWORK || Not enough mana. Need {cardData.manaCost}, have {data.Mana}");
+					return;
+				}
+
+				// subtract mana
+				data.Mana -= cardData.manaCost;
+			}
+		}
+		*/
+		
+		// validate slot index
+		if (slotIndex < 0 || slotIndex >= 3) {
+			Debug.Log($"PLAYER NETWORK || Invalid slot index: {slotIndex}");
+			return;
+		}
+
+		// remove card from hand
+		data.HandCardIds.Remove(cardId);
+		data.UpdateHandCount();
+
+		// ensure BoardCardIds has 3 slots (initialize with -1 for empty)
+		while (data.BoardCardIds.Length < 3) {
+			data.BoardCardIds.Add(-1);
+		}
+
+		// if slot already has a card, return that card to hand
+		if (data.BoardCardIds[slotIndex] != -1) {
+			int replacedCardId = data.BoardCardIds[slotIndex];
+			data.HandCardIds.Add(replacedCardId);
+			data.UpdateHandCount();
+			Debug.Log($"PLAYER NETWORK || Swapped card {replacedCardId} back to hand");
+
+			ClientRpcParams playerParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[] { OwnerClientId }
+            }
+        };
+        ReturnCardToHandClientRpc(replacedCardId, playerParams);
+		}
+
+		// place new card in slot
+		data.BoardCardIds[slotIndex] = cardId;
+		playerData.Value = data;
+
+		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} played card {cardId} to slot {slotIndex}");
+
+		// notify opponent to show card on their board
+		ulong opponentId = GetOpponentId(OwnerClientId);
+    if (opponentId != OwnerClientId)
+    {
+        ClientRpcParams opponentParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[] { opponentId }
+            }
+        };
+        NotifyOpponentCardPlayedClientRpc(cardId, slotIndex, opponentParams);
+    }
+	}
+
+	[ClientRpc]
+	private void ReturnCardToHandClientRpc(int cardId, ClientRpcParams clientRpcParams = default)
+	{
+			// find the card on the board and return it to hand
+			if (BoardManager.Instance != null)
+			{
+					for (int i = 0; i < 3; i++)
+					{
+							GameObject card = BoardManager.Instance.GetCardInSlot(i, true);
+							if (card != null)
+							{
+									CardVisual visual = card.GetComponent<CardVisual>();
+									if (visual != null && visual.CardID == cardId)
+									{
+											BoardManager.Instance.ReturnCardToHand(card);
+											break;
+									}
+							}
+					}
+			}
+	}
+
 	[ClientRpc]
 	private void NotifyPlayerPokedClientRpc(ulong playerId) {
 		if (playerId == NetworkManager.Singleton.LocalClientId) {
@@ -289,6 +426,30 @@ public class PlayerNetwork : NetworkBehaviour {
 		} else {
 			Debug.Log($"playerId: {playerId} pressed T");
 		}
+	}
+
+	[ClientRpc]
+	private void NotifyOpponentCardPlayedClientRpc(int cardId, int slotIndex, ClientRpcParams clientRpcParams = default) {
+		// only process for opponent (not the player who played it)
+		if (IsOwner) return;
+
+		if (BoardManager.Instance != null) {
+			BoardManager.Instance.PlaceOpponentCard(cardId, slotIndex);
+		}
+
+		Debug.Log($"PLAYER NETWORK || Opponent played card {cardId} to slot {slotIndex}");
+	}
+
+	public int GetCurrentMana() {
+		return playerData.Value.Mana;
+	}
+
+	public int GetCurrentActionPoints() {
+		return playerData.Value.ActionPoints;
+	}
+
+	public FixedList32Bytes<int> GetBoardCards() {
+		return playerData.Value.BoardCardIds;
 	}
 
 	[ClientRpc]
