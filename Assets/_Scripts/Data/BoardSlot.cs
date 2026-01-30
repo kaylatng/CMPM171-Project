@@ -181,25 +181,6 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         
         UpdateVisual();
 
-        // RemoveCard(notifyManager: false);
-        
-        // // place incoming card here
-        // PlaceCard(incomingCard);
-        
-        // // incoming card came from another slot, put the displaced card there
-        // if (previousSlot != null && previousSlot != this)
-        // {
-        //     previousSlot.PlaceCard(tempCard);
-        // }
-        // else
-        // {
-        //     // card came from hand, return displaced card to hand
-        //     if (BoardManager.Instance != null)
-        //     {
-        //         BoardManager.Instance.ReturnCardToHand(tempCard);
-        //     }
-        // }
-
         if (BoardManager.Instance != null)
         {
             BoardManager.Instance.OnCardPlacedInSlot(this, incomingCard, shouldNotifyServer: true);
@@ -308,12 +289,12 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         OnPointerExit();
     }
 
-#if UNITY_EDITOR
+    // FIXED: Made public and removed UNITY_EDITOR conditional so it works at runtime!
     public void SetSlotProperties(int index, bool playerSlot)
     {
         slotIndex = index;
         isPlayerSlot = playerSlot;
         gameObject.name = $"{(playerSlot ? "Player" : "Opponent")}Slot_{index}";
+        Debug.Log($"BOARD SLOT || Set slot properties - Index: {slotIndex}, IsPlayer: {isPlayerSlot}, Name: {gameObject.name}");
     }
-#endif
 }

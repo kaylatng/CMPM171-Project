@@ -207,8 +207,8 @@ public class PlayerNetwork : NetworkBehaviour {
 		}
 
 		// execute (false means it's not a free draw)
-    	ExecuteDrawServer(isFree: false);
-	}
+		ExecuteDrawServer(isFree: false);
+		}
 
 	[ServerRpc]
 	private void SetReadyServerRpc(bool readyStatus) {
@@ -345,15 +345,17 @@ public class PlayerNetwork : NetworkBehaviour {
 
 	[ClientRpc]
 	private void NotifyOpponentCardPlayedClientRpc(int cardId, int slotIndex, ClientRpcParams clientRpcParams = default) {
-		// only process for opponent (not the player who played it)
-		// if (IsOwner) return;
-
+		// Check if this client is the player who played the card
 		if (NetworkManager.Singleton.LocalClientId == OwnerClientId)
-    	{
-        return;
-    	}
+		{
+			Debug.Log($"PLAYER NETWORK || Skipping - this is the player who played the card");
+			return; // Skip - we're the player who played it
+		}
 
-		if (BoardManager.Instance != null){
+		Debug.Log($"PLAYER NETWORK || NotifyOpponentCardPlayedClientRpc - CardID: {cardId}, SlotIndex: {slotIndex}");
+
+		// NO MIRRORING - zones are not flipped, use slot index directly
+		if (BoardManager.Instance != null) {
 			BoardManager.Instance.PlaceOpponentCard(cardId, slotIndex);
 		}
 

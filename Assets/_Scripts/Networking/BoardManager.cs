@@ -111,10 +111,10 @@ public class BoardManager : MonoBehaviour
             BoardSlot slot = slotObj.GetComponent<BoardSlot>();
             if (slot != null)
             {
-#if UNITY_EDITOR
+                // FIXED: Set slot properties at runtime, not just in editor!
                 slot.SetSlotProperties(i, isPlayerZone);
-#endif
                 slotList.Add(slot);
+                Debug.Log($"BOARD MANAGER || Created {(isPlayerZone ? "Player" : "Opponent")} slot {i}");
             }
 
             float spacing = 2f;
@@ -280,12 +280,28 @@ public class BoardManager : MonoBehaviour
 
     public void PlaceOpponentCard(int cardId, int slotIndex)
     {
-        if (slotIndex < 0 || slotIndex >= opponentSlots.Count) return;
+        Debug.Log($"BOARD MANAGER || PlaceOpponentCard called - CardID: {cardId}, SlotIndex: {slotIndex}, OpponentSlots count: {opponentSlots.Count}");
+        
+        if (slotIndex < 0 || slotIndex >= opponentSlots.Count)
+        {
+            Debug.LogError($"BOARD MANAGER || Invalid slot index {slotIndex}. OpponentSlots count: {opponentSlots.Count}");
+            return;
+        }
 
         BoardSlot targetSlot = opponentSlots[slotIndex];
-        if (targetSlot == null) return;
+        if (targetSlot == null)
+        {
+            Debug.LogError($"BOARD MANAGER || Target slot at index {slotIndex} is null!");
+            return;
+        }
 
-        if (CardManager.Instance == null) return;
+        Debug.Log($"BOARD MANAGER || Target slot found: {targetSlot.name}, SlotIndex property: {targetSlot.SlotIndex}");
+
+        if (CardManager.Instance == null)
+        {
+            Debug.LogError($"BOARD MANAGER || CardManager.Instance is null!");
+            return;
+        }
 
         // STEP 1: remove one card from opponent hand (since they played it)
         CardManager.Instance.RemoveOneOpponentHandCard();
@@ -313,7 +329,7 @@ public class BoardManager : MonoBehaviour
             // place it in the slot using the normal flow
             targetSlot.PlaceCard(card);
             
-            Debug.Log($"BOARD MANAGER || Opponent placed card {cardId} in slot {slotIndex}");
+            Debug.Log($"BOARD MANAGER || Opponent placed card {cardId} in slot {slotIndex} (slot name: {targetSlot.name})");
         }
         else
         {
