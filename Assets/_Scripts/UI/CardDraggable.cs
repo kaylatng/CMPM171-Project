@@ -190,24 +190,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
         Debug.Log($"CARD DRAGGABLE || Raycast from world pos: {worldPosition}");
         Debug.Log($"CARD DRAGGABLE || Layer mask value: {boardSlotLayer.value}");
-        /*
-        RaycastHit2D hit;
-        if (boardSlotLayer != 0)
-        {
-            hit = Physics2D.Raycast(worldPosition, Vector2.zero, Mathf.Infinity, boardSlotLayer);
-        }
-        else
-        {
-            hit = Physics2D.Raycast(worldPosition, Vector2.zero);
-        }
-
-        if (hit.collider != null)
-        {
-            return hit.collider.GetComponent<BoardSlot>();
-        }
-
-        return null;
-        */
+        
         RaycastHit2D hit2d;
         if (boardSlotLayer != 0)
         {

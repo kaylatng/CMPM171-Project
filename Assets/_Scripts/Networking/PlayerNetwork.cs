@@ -5,11 +5,6 @@ using UnityEngine.InputSystem;
 
 public class PlayerNetwork : NetworkBehaviour {
 
-	// [SerializeField] private GameObject cardPrefab;
-	// private Transform playerHandZone;
-	// private Transform opponentHandZone;
-
-
 	private NetworkVariable<PlayerData> playerData = new NetworkVariable<PlayerData>(
 		new PlayerData {
 			Health = 20,
@@ -84,19 +79,6 @@ public class PlayerNetwork : NetworkBehaviour {
 	}
 
 	public override void OnNetworkSpawn() {
-		/*
-		GameObject pZone = GameObject.Find("PlayerHandZone");
-		GameObject oZone = GameObject.Find("OpponentHandZone");
-
-		if (pZone != null) playerHandZone = pZone.transform;
-		if (oZone != null) opponentHandZone = oZone.transform;
-
-		AssignHandZones();
-		*/
-		
-		// playerData.OnValueChanged += (PlayerData previousValue, PlayerData newValue) => {
-		// 	Debug.Log(OwnerClientId + "; " + newValue.Health + "; " + newValue.IsReady + "; " + newValue.PlayerName + "; Cards in hand: " + newValue.HandCardIds);
-		// };
 		playerData.OnValueChanged += (PlayerData previousValue, PlayerData newValue) => {
 			string idListString = "";
 			CardLibrary library = CardManager.Instance.GetCardLibrary();
@@ -131,21 +113,6 @@ public class PlayerNetwork : NetworkBehaviour {
 
 		if (Keyboard.current.tKey.wasPressedThisFrame) {
 			UpdatePlayerStateServerRpc();
-			/*
-			PlayerData data = playerData.Value;
-
-			data.Health -= 1;
-			data.IsReady = !data.IsReady;
-			data.PlayerName = "Molly";
-
-			// playerData.Value = new PlayerData {
-			// 	Health = 10,
-			// 	IsReady = true,
-			// 	PlayerName = "Placeholder Name",
-			// };
-
-			playerData.Value = data;
-			*/
 		}
 
 		if (Keyboard.current.dKey.wasPressedThisFrame) {
@@ -224,63 +191,23 @@ public class PlayerNetwork : NetworkBehaviour {
 	public void RequestCardDrawServerRpc(ServerRpcParams serverRpcParams = default) {
 		Debug.Log("RequestCardDrawServerRpc " + OwnerClientId + "; " + serverRpcParams.Receive.SenderClientId);
 		
-		/**
-		var senderId = serverRpcParams.Receive.SenderClientId;
-
-		if (GameManager.Instance.CurrentPhase.Value != GameManager.GamePhase.Planning) return;
-		
-		if (playerData.Value.CardsInHandCount >= 5) {
-			Debug.Log("Hand is full. Must use action point to discard.");
-			return;
-		}
-		
-		int drawnCardId = DeckManager.Instance.DrawCard();
-
-		if (drawnCardId == -1) {
-			Debug.Log("Deck is empty");
-			return;
-		}
-
-		PlayerData data = playerData.Value;
-		data.CardsInHandCount++;
-		playerData.Value = data;
-
-		// send card ID to drawing player
-		ClientRpcParams drawerParams = new ClientRpcParams {
-			Send = new ClientRpcSendParams {
-				TargetClientIds = new ulong[] { senderId }
-			}
-		};
-		ReceiveCardClientRpc(drawnCardId, true, drawerParams);
-
-		// tell other player to show hidden card
-		ulong opponentId = GetOpponentId(senderId);
-		if (opponentId != senderId) {
-			ClientRpcParams othersParams = new ClientRpcParams {
-				Send = new ClientRpcSendParams {
-					TargetClientIds = new ulong[] { opponentId }
-				}
-			};
-			ReceiveCardClientRpc(-1, false, othersParams);
-		}
-		**/
 		// 1. phase check
-    if (GameManager.Instance.CurrentPhase.Value != GameManager.GamePhase.Planning) return;
+		if (GameManager.Instance.CurrentPhase.Value != GameManager.GamePhase.Planning) return;
 
-    // 2. ap check
-    if (playerData.Value.ActionPoints <= 0) {
-			Debug.Log("Not enough AP!");
-			return;
-    }
+		// 2. ap check
+		if (playerData.Value.ActionPoints <= 0) {
+				Debug.Log("Not enough AP!");
+				return;
+		}
 
-    // 3. hand size check
-    if (playerData.Value.CardsInHandCount >= 5) {
-			Debug.Log("Hand full!");
-			return;
-    }
+		// 3. hand size check
+		if (playerData.Value.CardsInHandCount >= 5) {
+				Debug.Log("Hand full!");
+				return;
+		}
 
-    // execute (false means it's not a free draw)
-    ExecuteDrawServer(isFree: false);
+		// execute (false means it's not a free draw)
+    	ExecuteDrawServer(isFree: false);
 	}
 
 	[ServerRpc]
@@ -331,23 +258,6 @@ public class PlayerNetwork : NetworkBehaviour {
 			Debug.Log($"PLAYER NETWORK || Card {cardId} not in player's hand");
 			return;
 		}
-
-		/*
-		CardLibrary library = CardManager.Instance?.GetCardLibrary();
-		if (library != null) {
-			CardData cardData = library.GetCardByID(cardId);
-			if (cardData != null) {
-				// check mana cost
-				if (data.Mana < cardData.manaCost) {
-					Debug.Log($"PLAYER NETWORK || Not enough mana. Need {cardData.manaCost}, have {data.Mana}");
-					return;
-				}
-
-				// subtract mana
-				data.Mana -= cardData.manaCost;
-			}
-		}
-		*/
 		
 		// validate slot index
 		if (slotIndex < 0 || slotIndex >= 3) {
@@ -436,9 +346,14 @@ public class PlayerNetwork : NetworkBehaviour {
 	[ClientRpc]
 	private void NotifyOpponentCardPlayedClientRpc(int cardId, int slotIndex, ClientRpcParams clientRpcParams = default) {
 		// only process for opponent (not the player who played it)
-		if (IsOwner) return;
+		// if (IsOwner) return;
 
-		if (BoardManager.Instance != null) {
+		if (NetworkManager.Singleton.LocalClientId == OwnerClientId)
+    	{
+        return;
+    	}
+
+		if (BoardManager.Instance != null){
 			BoardManager.Instance.PlaceOpponentCard(cardId, slotIndex);
 		}
 
@@ -459,44 +374,6 @@ public class PlayerNetwork : NetworkBehaviour {
 
 	[ClientRpc]
 	private void ReceiveCardClientRpc(int cardId, bool isMyCard, ClientRpcParams clientRpcParams = default) {
-		/*
-		if (cardId >= 60 && cardId <= 65 ) {
-			Debug.Log("Drew modifier card");
-		} else {
-			Debug.Log($"Drew spell ID: {cardId}");
-		}
-		*/
-
-		// MOVED TO CardManager
-		/*
-		if (playerHandZone == null) {
-			GameObject pZone = GameObject.Find("PlayerHandZone");
-			if (pZone != null) playerHandZone = pZone.transform;
-    }
-    if (opponentHandZone == null) {
-			GameObject oZone = GameObject.Find("OpponentHandZone");
-			if (oZone != null) opponentHandZone = oZone.transform;
-    }
-
-		Transform targetZone = isMyCard ? playerHandZone : opponentHandZone;
-		if (targetZone == null) {
-			targetZone = GameObject.Find(isMyCard ? "PlayerHandZone" : "OpponentHandZone").transform;
-		}
-
-		GameObject newCard = Instantiate(cardPrefab, targetZone);
-		newCard.transform.SetParent(targetZone, false);
-
-		SpriteRenderer sr = newCard.GetComponent<SpriteRenderer>();
-    	if (sr == null) sr = newCard.GetComponentInChildren<SpriteRenderer>();
-		
-		if (isMyCard) {
-			newCard.GetComponent<CardVisual>().Initialize(cardId);
-		} else {
-			// Opponent's card: set to a hidden card visual
-			newCard.GetComponent<SpriteRenderer>().color = Color.red;
-		}
-		*/
-
 		if (CardManager.Instance != null) {
 			CardManager.Instance.SpawnCard(cardId, isMyCard);
 		} else {
@@ -510,16 +387,4 @@ public class PlayerNetwork : NetworkBehaviour {
 		}
 		return drawerId;
 	}
-
-	// private void AssignHandZones() {
-	// 	if (playerHandZone == null) {
-	// 		GameObject pZone = GameObject.Find("PlayerHandZone");
-	// 		if (pZone != null) playerHandZone = pZone.transform;
-	// 	}
-
-	// 	if (opponentHandZone == null) {
-	// 		GameObject oZone = GameObject.Find("OpponentHandZone");
-	// 		if (oZone != null) opponentHandZone = oZone.transform;
-	// 	}
-	// }
 }
