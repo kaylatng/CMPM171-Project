@@ -10,6 +10,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     
     [Header("Visual Feedback")]
     [SerializeField] private Color selectedColor = new Color(1f, 1f, 0.5f, 1f);
+    [SerializeField] private Color cannotPlayColor = new Color(1f, 0.3f, 0.3f, 1f);
     [SerializeField] private Vector3 selectedScale = new Vector3(1.1f, 1.1f, 1f);
     
     private Vector3 originalPosition;
@@ -50,6 +51,13 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (isDragging) return;
 
         if (!IsPlayerCard()) return;
+
+        // check if card can be played before allowing selection
+        if (!CanBePlayed())
+        {
+            ShowCannotPlayFeedback();
+            return;
+        }
 
         // toggle selection
         if (isSelected)
@@ -108,6 +116,13 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             return;
         }
 
+        // check if card can be played before allowing drag
+        if (!CanBePlayed())
+        {
+            ShowCannotPlayFeedback();
+            return;
+        }
+
         // deselect if selected
         if (isSelected)
         {
@@ -161,6 +176,15 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             
             if (targetSlot.IsPlayerSlot)
             {
+                // double-check we can still play the card
+                if (!CanBePlayed())
+                {
+                    Debug.Log($"CARD DRAGGABLE || Cannot play card - insufficient resources or wrong phase");
+                    ShowCannotPlayFeedback();
+                    ReturnToOriginalPosition();
+                    return;
+                }
+
                 // valid drop - place card in slot
                 if (currentSlot != null)
                 {
@@ -236,27 +260,67 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     public bool CanBePlayed()
     {
+        // 1. CHECK PHASE - can only play during planning phase
+        if (GameManager.Instance == null || !GameManager.Instance.CanPlayCards())
+        {
+            Debug.Log($"CARD DRAGGABLE || Cannot play - not in Planning phase");
+            return false;
+        }
+
+        // 2. GET PLAYER REFERENCE
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsClient)
+        {
+            return false;
+        }
+
+        var localPlayer = NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
+        if (localPlayer == null)
+        {
+            return false;
+        }
+
+        // 3. CHECK ACTION POINTS - need at least 1 AP to play
+        if (localPlayer.GetCurrentActionPoints() <= 0)
+        {
+            Debug.Log($"CARD DRAGGABLE || Cannot play - no AP remaining (0/5)");
+            return false;
+        }
+
+        // 4. CHECK MANA COST
         CardVisual cardVisual = GetComponent<CardVisual>();
         if (cardVisual == null) return false;
 
-        // card data
         if (CardManager.Instance != null && CardManager.Instance.GetCardLibrary() != null)
         {
             CardData cardData = CardManager.Instance.GetCardLibrary().GetTierOneAssetFromPool(cardVisual.CardID);
             if (cardData == null) return false;
 
-            // check player has enough mana
-            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient)
+            int currentMana = localPlayer.GetCurrentMana();
+            if (currentMana < cardData.manaCost)
             {
-                var localPlayer = NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
-                if (localPlayer != null)
-                {
-                    return localPlayer.GetCurrentMana() >= cardData.manaCost;
-                }
+                Debug.Log($"CARD DRAGGABLE || Cannot play - not enough mana (need {cardData.manaCost}, have {currentMana})");
+                return false;
             }
         }
 
-        return true; // DEBUG DEFAULT TRUE 
+        return true;
+    }
+
+    private void ShowCannotPlayFeedback()
+    {
+        // flash red to indicate cannot play
+        if (spriteRenderer != null)
+        {
+            StartCoroutine(FlashCannotPlay());
+        }
+    }
+
+    private System.Collections.IEnumerator FlashCannotPlay()
+    {
+        Color original = spriteRenderer.color;
+        spriteRenderer.color = cannotPlayColor;
+        yield return new WaitForSeconds(0.2f);
+        spriteRenderer.color = original;
     }
 
     public void PlayCard()

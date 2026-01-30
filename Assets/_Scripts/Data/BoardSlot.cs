@@ -11,6 +11,7 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
     [SerializeField] private Color emptyColor = new Color(1f, 1f, 1f, 0.3f);
     [SerializeField] private Color occupiedColor = new Color(0.5f, 0.5f, 0.5f, 0.3f);
     [SerializeField] private Color hoverColor = new Color(0.8f, 1f, 0.8f, 0.5f);
+    [SerializeField] private Color cannotPlaceColor = new Color(1f, 0.3f, 0.3f, 0.5f);
     
     private SpriteRenderer spriteRenderer;
     private GameObject occupyingCard;
@@ -64,6 +65,14 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         
         if (CardDraggable.SelectedCard != null)
         {
+            // check if the selected card can be played
+            if (!CardDraggable.SelectedCard.CanBePlayed())
+            {
+                Debug.Log($"BOARD SLOT || Cannot place card - insufficient resources or wrong phase");
+                ShowCannotPlaceFeedback();
+                return;
+            }
+
             TryPlaceCard(CardDraggable.SelectedCard.gameObject);
         }
         else if (occupyingCard != null)
@@ -90,6 +99,7 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
             CardDraggable cardDraggable = droppedObject.GetComponent<CardDraggable>();
             if (cardDraggable != null)
             {
+                // validation is already done in CardDraggable.OnEndDrag
                 TryPlaceCard(droppedObject);
             }
         }
@@ -101,6 +111,14 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
 
         CardDraggable cardDraggable = card.GetComponent<CardDraggable>();
         if (cardDraggable == null) return false;
+
+        // CLIENT-SIDE VALIDATION: check if card can be played
+        if (!cardDraggable.CanBePlayed())
+        {
+            Debug.Log($"BOARD SLOT || Cannot place card - validation failed");
+            ShowCannotPlaceFeedback();
+            return false;
+        }
 
         // if this slot is already occupied, swap cards
         if (IsOccupied)
@@ -266,6 +284,22 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         }
     }
 
+    private void ShowCannotPlaceFeedback()
+    {
+        if (spriteRenderer != null)
+        {
+            StartCoroutine(FlashCannotPlace());
+        }
+    }
+
+    private System.Collections.IEnumerator FlashCannotPlace()
+    {
+        Color original = spriteRenderer.color;
+        spriteRenderer.color = cannotPlaceColor;
+        yield return new WaitForSeconds(0.2f);
+        UpdateVisual(); // restore proper color based on state
+    }
+
     public void OnPointerEnter()
     {
         if (!isPlayerSlot) return;
@@ -289,7 +323,6 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         OnPointerExit();
     }
 
-    // FIXED: Made public and removed UNITY_EDITOR conditional so it works at runtime!
     public void SetSlotProperties(int index, bool playerSlot)
     {
         slotIndex = index;
