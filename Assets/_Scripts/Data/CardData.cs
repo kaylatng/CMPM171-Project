@@ -9,6 +9,9 @@ public class CardData : ScriptableObject
   public int tier = 1;         // 1, 2, or 3
   public bool isModifier;      // true for Duplicator
 
+  [Header("Next Tier")]
+  public CardData nextTier;
+
   [Header("Stats")]
   public int manaCost;         // set to 0 for Duplicator
   public int attackDamage;

@@ -16,6 +16,7 @@ MonoBehaviour:
   cardID: 601
   tier: 2
   isModifier: 0
+  nextTier: {fileID: 11400000, guid: 73d9b2ecb31517b4983c527149f20392, type: 2}
   manaCost: 0
   attackDamage: 0
   cardArt: {fileID: 0}
