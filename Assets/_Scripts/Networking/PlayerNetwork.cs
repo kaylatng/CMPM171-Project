@@ -2,6 +2,7 @@ using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System.Collections.Generic;
 
 public class PlayerNetwork : NetworkBehaviour {
 
@@ -373,15 +374,27 @@ public class PlayerNetwork : NetworkBehaviour {
 	private void ReturnCardToHandClientRpc(int cardId, ClientRpcParams clientRpcParams = default) {
 		// find the card on the board and return it to hand
 		if (BoardManager.Instance != null) {
-			for (int i = 0; i < 3; i++) {
-				GameObject card = BoardManager.Instance.GetCardInSlot(i, true);
-				if (card != null) {
-					CardVisual visual = card.GetComponent<CardVisual>();
-					if (visual != null && visual.CardID == cardId) {
-						BoardManager.Instance.ReturnCardToHand(card);
-						break;
+			// for (int i = 0; i < 3; i++) {
+			// 	GameObject card = BoardManager.Instance.GetCardInSlot(i, true);
+			// 	if (card != null) {
+			// 		CardVisual visual = card.GetComponent<CardVisual>();
+			// 		if (visual != null && visual.CardID == cardId) {
+			// 			BoardManager.Instance.ReturnCardToHand(card);
+			// 			break;
+			// 		}
+			// 	}
+			// }
+
+			List<GameObject> boardCards = BoardManager.Instance.GetBoardCards(true);
+			
+			foreach (GameObject card in boardCards) {
+					if (card != null) {
+							CardVisual visual = card.GetComponent<CardVisual>();
+							if (visual != null && visual.CardID == cardId) {
+									BoardManager.Instance.ReturnCardToHand(card);
+									break;
+							}
 					}
-				}
 			}
 		}
 	}

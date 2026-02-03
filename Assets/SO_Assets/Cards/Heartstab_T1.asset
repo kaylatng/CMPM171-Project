@@ -18,6 +18,9 @@ MonoBehaviour:
   isModifier: 0
   manaCost: 0
   attackDamage: 0
-  cardArt: {fileID: 0}
+  maxCharges: 0
+  destroyOnEmpty: 1
+  cardArt: {fileID: -3139299014816269367, guid: 450e0e3977bf4d44dab73472c447c8be, type: 3}
   themeColor: {r: 0, g: 0, b: 0, a: 0}
+  nextTier: {fileID: 0}
   description: 

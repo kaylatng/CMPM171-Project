@@ -1,5 +1,7 @@
 using UnityEngine;
 using Unity.Netcode;
+using System.Collections;
+using System.Collections.Generic;
 
 public class CardManager : MonoBehaviour
 {
@@ -15,9 +17,34 @@ public class CardManager : MonoBehaviour
 
     [Header("Card Layout Settings")]
     [SerializeField] private float cardSpacing = 1.5f;
-    [SerializeField] private float cardArcHeight = 0.5f; // arc WIP
-    [SerializeField] private float cardRotationAngle = 5f;
+    [SerializeField] private float maxCardSpread = 8f; // Maximum horizontal spread
+    [SerializeField] private float cardArcHeight = 0.2f;
+    [SerializeField] private float maxCardRotation = 5f; // Max rotation in degrees
+    
+    [Header("Animation Settings")]
+    [SerializeField] private float cardMoveSpeed = 12f; // Speed for lerping to position
+    [SerializeField] private AnimationCurve movementCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+    [SerializeField] private float hoverLiftHeight = 0.3f;
+    [SerializeField] private float hoverScale = 1.1f;
+    [SerializeField] private float hoverRotationReduction = 0.7f; // Reduce rotation when hovering
+    
+    [Header("Sorting")]
+    [SerializeField] private int baseSortingOrder = 0;
+    [SerializeField] private int hoverSortingOrder = 100;
 
+    // Track cards for smooth updates
+    private List<CardInHand> playerHandCards = new List<CardInHand>();
+    private List<CardInHand> opponentHandCards = new List<CardInHand>();
+
+    private class CardInHand
+    {
+        public GameObject cardObject;
+        public Vector3 targetPosition;
+        public Quaternion targetRotation;
+        public int targetSortingOrder;
+        public bool isHovered;
+        public float hoverProgress; // 0 to 1 for smooth hover transition
+    }
 
     private void Awake()
     {
@@ -32,6 +59,13 @@ public class CardManager : MonoBehaviour
     private void Start()
     {
         AssignHandZones();
+    }
+
+    private void Update()
+    {
+        // Smoothly update all cards in hands
+        UpdateHandCards(playerHandCards);
+        UpdateHandCards(opponentHandCards);
     }
 
     public void AssignHandZones()
@@ -85,13 +119,16 @@ public class CardManager : MonoBehaviour
 
         InitializeCardVisual(newCard, cardId, isPlayerCard);
 
+        // Add hover listener for Balatro-style hover effect
+        AddCardHoverListener(newCard, isPlayerCard);
+
+        // Arrange cards with smooth animation
         ArrangeCardsInHand(targetZone);
 
         Debug.Log($"CARD MANAGER || Spawned card {cardId} in {(isPlayerCard ? "player" : "opponent")} hand");
         return newCard;
     }
 
-    // spawn a card directly at a specific parent (e.g., a board slot)
     public GameObject SpawnCardAtParent(int cardId, bool revealCard, Transform parent)
     {
         if (parent == null)
@@ -116,34 +153,140 @@ public class CardManager : MonoBehaviour
     {
         if (handZone == null) return;
 
+        List<CardInHand> handCards = handZone == playerHandZone ? playerHandCards : opponentHandCards;
+        
+        // Clear and rebuild card list
+        handCards.Clear();
+        
         int cardCount = handZone.childCount;
         if (cardCount == 0) return;
 
-        float totalWidth = (cardCount - 1) * cardSpacing;
+        // Calculate layout
+        float actualSpacing = Mathf.Min(cardSpacing, maxCardSpread / Mathf.Max(1, cardCount - 1));
+        float totalWidth = (cardCount - 1) * actualSpacing;
         float startX = -totalWidth / 2f;
 
         for (int i = 0; i < cardCount; i++)
         {
-            Transform card = handZone.GetChild(i);
+            Transform cardTransform = handZone.GetChild(i);
             
+            // Create card data
+            CardInHand cardData = new CardInHand
+            {
+                cardObject = cardTransform.gameObject
+            };
+
             float normalizedPosition = cardCount > 1 ? (float)i / (cardCount - 1) : 0.5f;
-            float xPos = startX + (i * cardSpacing);
+            float xPos = startX + (i * actualSpacing);
             
-            // create arc effect
+            // Create arc effect using parabola
             float yPos = -cardArcHeight * 4f * (normalizedPosition - 0.5f) * (normalizedPosition - 0.5f) + cardArcHeight;
             
-            card.localPosition = new Vector3(xPos, yPos, 0);
+            cardData.targetPosition = new Vector3(xPos, yPos, 0);
             
-            // create fan rotation effect
-            float rotationZ = Mathf.Lerp(cardRotationAngle, -cardRotationAngle, normalizedPosition);
-            card.localRotation = Quaternion.Euler(0, 0, rotationZ);
+            // Create fan rotation effect
+            float rotationZ = Mathf.Lerp(maxCardRotation, -maxCardRotation, normalizedPosition);
+            cardData.targetRotation = Quaternion.Euler(0, 0, rotationZ);
             
-            // Optional: Set sorting order based on position (leftmost cards behind)
-            SpriteRenderer spriteRenderer = card.GetComponent<SpriteRenderer>();
-            if (spriteRenderer != null)
+            // Set sorting order (leftmost cards behind)
+            cardData.targetSortingOrder = baseSortingOrder + i;
+            
+            handCards.Add(cardData);
+        }
+    }
+
+    private void UpdateHandCards(List<CardInHand> handCards)
+    {
+        foreach (var cardData in handCards)
+        {
+            if (cardData.cardObject == null) continue;
+
+            // Smooth hover transition
+            float targetHover = cardData.isHovered ? 1f : 0f;
+            cardData.hoverProgress = Mathf.Lerp(cardData.hoverProgress, targetHover, Time.deltaTime * 10f);
+
+            // Calculate final position with hover offset
+            Vector3 finalPosition = cardData.targetPosition;
+            Quaternion finalRotation = cardData.targetRotation;
+            float finalScale = 1f;
+            int finalSortingOrder = cardData.targetSortingOrder;
+
+            if (cardData.hoverProgress > 0.01f)
             {
-                spriteRenderer.sortingOrder = i;
+                // Apply hover effects
+                finalPosition.y += hoverLiftHeight * cardData.hoverProgress;
+                finalScale = Mathf.Lerp(1f, hoverScale, cardData.hoverProgress);
+                
+                // Reduce rotation when hovered (more upright)
+                float currentRotation = finalRotation.eulerAngles.z;
+                if (currentRotation > 180f) currentRotation -= 360f;
+                currentRotation *= Mathf.Lerp(1f, hoverRotationReduction, cardData.hoverProgress);
+                finalRotation = Quaternion.Euler(0, 0, currentRotation);
+                
+                finalSortingOrder = hoverSortingOrder;
             }
+
+            // Smooth movement using lerp
+            cardData.cardObject.transform.localPosition = Vector3.Lerp(
+                cardData.cardObject.transform.localPosition,
+                finalPosition,
+                Time.deltaTime * cardMoveSpeed
+            );
+
+            cardData.cardObject.transform.localRotation = Quaternion.Lerp(
+                cardData.cardObject.transform.localRotation,
+                finalRotation,
+                Time.deltaTime * cardMoveSpeed
+            );
+
+            cardData.cardObject.transform.localScale = Vector3.Lerp(
+                cardData.cardObject.transform.localScale,
+                Vector3.one * finalScale,
+                Time.deltaTime * cardMoveSpeed
+            );
+
+            // Update sorting order
+            SpriteRenderer sr = cardData.cardObject.GetComponent<SpriteRenderer>();
+            if (sr != null)
+            {
+                sr.sortingOrder = finalSortingOrder;
+            }
+        }
+    }
+
+    private void AddCardHoverListener(GameObject card, bool isPlayerCard)
+    {
+        if (!isPlayerCard) return; // Only add hover to player cards
+
+        // Add a simple hover component
+        CardHoverEffect hoverEffect = card.GetComponent<CardHoverEffect>();
+        if (hoverEffect == null)
+        {
+            hoverEffect = card.AddComponent<CardHoverEffect>();
+        }
+
+        // Subscribe to hover events
+        hoverEffect.OnHoverEnter += () => OnCardHoverEnter(card);
+        hoverEffect.OnHoverExit += () => OnCardHoverExit(card);
+    }
+
+    private void OnCardHoverEnter(GameObject card)
+    {
+        // Find card in hand and mark as hovered
+        CardInHand cardData = playerHandCards.Find(c => c.cardObject == card);
+        if (cardData != null)
+        {
+            cardData.isHovered = true;
+        }
+    }
+
+    private void OnCardHoverExit(GameObject card)
+    {
+        // Find card in hand and unmark hover
+        CardInHand cardData = playerHandCards.Find(c => c.cardObject == card);
+        if (cardData != null)
+        {
+            cardData.isHovered = false;
         }
     }
 
@@ -165,27 +308,15 @@ public class CardManager : MonoBehaviour
 
         if (revealCard && cardId >= 0)
         {
-            // player card - show it fully
             if (cardVisual != null)
             {
-                cardVisual.Initialize(cardId);
+                CardData data = cardLibrary.GetTierOneAssetFromPool(cardId);
+                cardVisual.Initialize(cardId, data);
             }
-
-            // TO-DO: implement sync to GetCardByID
-            /*
-            if (cardLibrary != null)
-            {
-                CardData cardData = cardLibrary.GetCardByID(cardId);
-                if (cardData != null)
-                {
-                    ApplyCardData(cardObject, cardData, spriteRenderer);
-                }
-            }
-            */
         }
         else
         {
-            // opponent card - show card back
+            // Opponent card - show card back
             if (spriteRenderer != null)
             {
                 if (cardLibrary != null && cardLibrary.cardBack != null)
@@ -194,12 +325,10 @@ public class CardManager : MonoBehaviour
                 }
                 else
                 {
-                    // fallback: use red color for hidden cards
-                    spriteRenderer.color = Color.white; // change to red for code testing
+                    spriteRenderer.color = Color.white;
                 }
             }
 
-            // store object is hidden card
             if (cardVisual != null)
             {
                 cardVisual.CardID = -1;
@@ -213,24 +342,20 @@ public class CardManager : MonoBehaviour
         }
     }
 
-    private void ApplyCardData(GameObject cardObject, CardData cardData, SpriteRenderer spriteRenderer)
-    {
-        // render sprite here
-
-        // assign name text, mana cost, attack damage displays here
-        return;
-    }
-
     public void RemoveCardFromHand(GameObject cardObject)
     {
         if (cardObject == null) return;
         
         Transform parent = cardObject.transform.parent;
         
-        // deparent it - don't destroy
+        // Remove from tracking lists
+        playerHandCards.RemoveAll(c => c.cardObject == cardObject);
+        opponentHandCards.RemoveAll(c => c.cardObject == cardObject);
+        
+        // Deparent it - don't destroy
         cardObject.transform.SetParent(null);
         
-        // rearrange remaining cards in hand
+        // Rearrange remaining cards in hand
         if (parent != null && (parent == playerHandZone || parent == opponentHandZone))
         {
             ArrangeCardsInHand(parent);
@@ -242,9 +367,13 @@ public class CardManager : MonoBehaviour
         if (cardObject != null)
         {
             Transform parent = cardObject.transform.parent;
+            
+            // Remove from tracking
+            playerHandCards.RemoveAll(c => c.cardObject == cardObject);
+            opponentHandCards.RemoveAll(c => c.cardObject == cardObject);
+            
             Destroy(cardObject);
             
-            // rearrange remaining cards after removal
             if (parent != null)
             {
                 ArrangeCardsInHand(parent);
@@ -252,7 +381,6 @@ public class CardManager : MonoBehaviour
         }
     }
 
-    // remove one card from opponent hand (used when they play a card)
     public void RemoveOneOpponentHandCard()
     {
         if (opponentHandZone == null)
@@ -277,6 +405,15 @@ public class CardManager : MonoBehaviour
         Transform targetZone = isPlayerZone ? playerHandZone : opponentHandZone;
         
         if (targetZone == null) return;
+
+        if (isPlayerZone)
+        {
+            playerHandCards.Clear();
+        }
+        else
+        {
+            opponentHandCards.Clear();
+        }
 
         foreach (Transform child in targetZone)
         {

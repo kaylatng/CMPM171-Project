@@ -7,20 +7,31 @@ public class BoardManager : MonoBehaviour
     public static BoardManager Instance;
 
     [Header("Board Settings")]
-    [SerializeField] private int slotsPerPlayer = 3;
+    [SerializeField] private int maxCardsPerBoard = 3;
     
     [Header("Board Zones")]
     [SerializeField] private Transform playerBoardZone;
     [SerializeField] private Transform opponentBoardZone;
 
-    [Header("Slot Prefab")]
-    [SerializeField] private GameObject slotPrefab;
+    [Header("Card Layout")]
+    [SerializeField] private float cardSpacing = 2.0f;
+    [SerializeField] private float cardMoveSpeed = 12f;
+    [SerializeField] private AnimationCurve layoutCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
-    private List<BoardSlot> playerSlots = new List<BoardSlot>();
-    private List<BoardSlot> opponentSlots = new List<BoardSlot>();
+    [Header("Visual Feedback")]
+    [SerializeField] private Color validDropColor = new Color(0.5f, 1f, 0.5f, 0.3f);
+    [SerializeField] private Color invalidDropColor = new Color(1f, 0.3f, 0.3f, 0.3f);
+    [SerializeField] private Color normalZoneColor = new Color(1f, 1f, 1f, 0.1f);
 
-    private Dictionary<int, GameObject> playerBoardCards = new Dictionary<int, GameObject>();
-    private Dictionary<int, GameObject> opponentBoardCards = new Dictionary<int, GameObject>();
+    private List<GameObject> playerBoardCards = new List<GameObject>();
+    private List<GameObject> opponentBoardCards = new List<GameObject>();
+
+    // For smooth card positioning
+    private Dictionary<GameObject, Vector3> cardTargetPositions = new Dictionary<GameObject, Vector3>();
+    private Dictionary<GameObject, int> cardBoardIndices = new Dictionary<GameObject, int>();
+
+    private SpriteRenderer playerZoneRenderer;
+    private SpriteRenderer opponentZoneRenderer;
 
     private void Awake()
     {
@@ -37,7 +48,13 @@ public class BoardManager : MonoBehaviour
     private void Start()
     {
         SetupBoardZones();
-        CreateBoardSlots();
+        SetupZoneVisuals();
+    }
+
+    private void Update()
+    {
+        // Smoothly move cards to their target positions
+        UpdateCardPositions();
     }
 
     private void SetupBoardZones()
@@ -71,253 +88,324 @@ public class BoardManager : MonoBehaviour
         }
     }
 
-    private void CreateBoardSlots()
+    private void SetupZoneVisuals()
     {
-        if (slotPrefab == null)
+        // Add visual feedback to board zones
+        if (playerBoardZone != null)
         {
-            Debug.LogWarning("BOARD MANAGER || Slot prefab not assigned. Slots will need to be created manually.");
-            return;
-        }
+            playerZoneRenderer = playerBoardZone.GetComponent<SpriteRenderer>();
+            if (playerZoneRenderer == null)
+            {
+                playerZoneRenderer = playerBoardZone.gameObject.AddComponent<SpriteRenderer>();
+                playerZoneRenderer.sprite = CreateZoneSprite();
+                playerZoneRenderer.sortingOrder = -10;
+            }
+            playerZoneRenderer.color = normalZoneColor;
 
-        // player slots
-        CreateSlotsForZone(playerBoardZone, true, playerSlots);
-        
-        // opponent slots
-        CreateSlotsForZone(opponentBoardZone, false, opponentSlots);
-
-        Debug.Log($"BOARD MANAGER || Created {slotsPerPlayer} slots for each player");
-    }
-
-    private void CreateSlotsForZone(Transform zone, bool isPlayerZone, List<BoardSlot> slotList)
-    {
-        if (zone == null) return;
-
-        int slotLayer = zone.gameObject.layer;
-
-        for (int i = 0; i < slotsPerPlayer; i++)
-        {
-            GameObject slotObj = Instantiate(slotPrefab, zone);
-            slotObj.name = $"{(isPlayerZone ? "Player" : "Opponent")}Slot_{i}";
-
-            slotObj.layer = slotLayer;
-
-            BoxCollider2D collider = slotObj.GetComponent<BoxCollider2D>();
+            // Add collider for drop detection
+            BoxCollider2D collider = playerBoardZone.GetComponent<BoxCollider2D>();
             if (collider == null)
             {
-                collider = slotObj.AddComponent<BoxCollider2D>();
-                collider.size = new Vector2(1.5f, 2f);
-            }
-            
-            BoardSlot slot = slotObj.GetComponent<BoardSlot>();
-            if (slot != null)
-            {
-                // FIXED: Set slot properties at runtime, not just in editor!
-                slot.SetSlotProperties(i, isPlayerZone);
-                slotList.Add(slot);
-                Debug.Log($"BOARD MANAGER || Created {(isPlayerZone ? "Player" : "Opponent")} slot {i}");
-            }
-
-            float spacing = 2f;
-            float startX = -(slotsPerPlayer - 1) * spacing / 2f;
-            slotObj.transform.localPosition = new Vector3(startX + i * spacing, 0, 0);
-        }
-    }
-
-    public void RegisterSlot(BoardSlot slot)
-    {
-        if (slot == null) return;
-
-        if (slot.IsPlayerSlot)
-        {
-            if (!playerSlots.Contains(slot))
-            {
-                playerSlots.Add(slot);
+                collider = playerBoardZone.gameObject.AddComponent<BoxCollider2D>();
+                collider.size = new Vector2(1f, 1f); // Wide enough for 3 cards
             }
         }
-        else
+
+        if (opponentBoardZone != null)
         {
-            if (!opponentSlots.Contains(slot))
+            opponentZoneRenderer = opponentBoardZone.GetComponent<SpriteRenderer>();
+            if (opponentZoneRenderer == null)
             {
-                opponentSlots.Add(slot);
+                opponentZoneRenderer = opponentBoardZone.gameObject.AddComponent<SpriteRenderer>();
+                opponentZoneRenderer.sprite = CreateZoneSprite();
+                opponentZoneRenderer.sortingOrder = -10;
+            }
+            opponentZoneRenderer.color = normalZoneColor;
+
+            BoxCollider2D collider = opponentBoardZone.GetComponent<BoxCollider2D>();
+            if (collider == null)
+            {
+                collider = opponentBoardZone.gameObject.AddComponent<BoxCollider2D>();
+                collider.size = new Vector2(1f, 1f);
             }
         }
     }
 
-    public void OnCardPlacedInSlot(BoardSlot slot, GameObject card, bool shouldNotifyServer = true)
+    private Sprite CreateZoneSprite()
     {
-        if (slot == null || card == null) return;
-
-        CardVisual cardVisual = card.GetComponent<CardVisual>();
-        if (cardVisual == null) return;
-
-        if (slot.IsPlayerSlot)
-        {
-            playerBoardCards[slot.SlotIndex] = card;
-
-            if (shouldNotifyServer)
-            {
-                CardDraggable draggable = card.GetComponent<CardDraggable>();
-                if (draggable != null)
-                {
-                    draggable.PlayCard();
-                }
-            }
-        }
-        else
-        {
-            opponentBoardCards[slot.SlotIndex] = card;
-        }
-
-        if (slot.IsPlayerSlot)
-        {
-            CardDraggable draggable = card.GetComponent<CardDraggable>();
-            if (draggable != null)
-            {
-                draggable.PlayCard();
-            }
-        }
-
-        Debug.Log($"BOARD MANAGER || Card {cardVisual.CardID} placed in {(slot.IsPlayerSlot ? "Player" : "Opponent")} slot {slot.SlotIndex}");
+        // Create a simple rectangular sprite for the zone
+        Texture2D texture = new Texture2D(1, 1);
+        texture.SetPixel(0, 0, Color.white);
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1);
     }
 
-    public void OnCardRemovedFromSlot(BoardSlot slot, GameObject card)
+    public bool CanPlaceCardOnBoard(bool isPlayerCard)
     {
-        if (slot == null) return;
+        List<GameObject> targetBoard = isPlayerCard ? playerBoardCards : opponentBoardCards;
+        return targetBoard.Count < maxCardsPerBoard;
+    }
 
-        if (slot.IsPlayerSlot)
+    public bool TryPlaceCard(GameObject card, bool isPlayerCard, int? preferredIndex = null)
+    {
+        if (card == null)
         {
-            playerBoardCards.Remove(slot.SlotIndex);
+            Debug.LogError("BOARD MANAGER || Cannot place null card");
+            return false;
+        }
+
+        List<GameObject> targetBoard = isPlayerCard ? playerBoardCards : opponentBoardCards;
+        Transform targetZone = isPlayerCard ? playerBoardZone : opponentBoardZone;
+
+        // Check if board is full
+        if (targetBoard.Count >= maxCardsPerBoard)
+        {
+            Debug.Log($"BOARD MANAGER || Board full! ({targetBoard.Count}/{maxCardsPerBoard})");
+            ShowInvalidDropFeedback(isPlayerCard);
+            return false;
+        }
+
+        // Check if card is already on this board
+        if (targetBoard.Contains(card))
+        {
+            Debug.Log("BOARD MANAGER || Card already on board, repositioning");
+            // Just rearrange
+            ArrangeCardsOnBoard(isPlayerCard);
+            return true;
+        }
+
+        // Remove from other board if present
+        RemoveCardFromBoard(card, !isPlayerCard, notifyServer: false);
+
+        // Add to board
+        card.transform.SetParent(targetZone, true);
+        
+        if (preferredIndex.HasValue && preferredIndex.Value < targetBoard.Count)
+        {
+            targetBoard.Insert(preferredIndex.Value, card);
         }
         else
         {
-            opponentBoardCards.Remove(slot.SlotIndex);
+            targetBoard.Add(card);
         }
 
-        Debug.Log($"BOARD MANAGER || Card removed from {(slot.IsPlayerSlot ? "Player" : "Opponent")} slot {slot.SlotIndex}");
+        cardBoardIndices[card] = targetBoard.IndexOf(card);
+
+        // Arrange all cards
+        ArrangeCardsOnBoard(isPlayerCard);
+
+        Debug.Log($"BOARD MANAGER || Placed card on {(isPlayerCard ? "player" : "opponent")} board ({targetBoard.Count}/{maxCardsPerBoard})");
+
+        // Notify network if needed
+        if (isPlayerCard)
+        {
+            NotifyServerCardPlaced(card);
+        }
+
+        return true;
+    }
+
+    private void ArrangeCardsOnBoard(bool isPlayerBoard)
+    {
+        List<GameObject> cards = isPlayerBoard ? playerBoardCards : opponentBoardCards;
+        Transform zone = isPlayerBoard ? playerBoardZone : opponentBoardZone;
+
+        if (cards.Count == 0) return;
+
+        // Calculate total width and starting position
+        float totalWidth = (cards.Count - 1) * cardSpacing;
+        float startX = -totalWidth / 2f;
+
+        for (int i = 0; i < cards.Count; i++)
+        {
+            GameObject card = cards[i];
+            if (card == null) continue;
+
+            // Calculate target position
+            float xPos = startX + (i * cardSpacing);
+            Vector3 targetPos = zone.position + new Vector3(xPos, 0, 0);
+
+            // Store target position for smooth movement
+            cardTargetPositions[card] = targetPos;
+            cardBoardIndices[card] = i;
+
+            // Reset rotation and scale
+            card.transform.rotation = Quaternion.identity;
+            card.transform.localScale = Vector3.one;
+
+            // Set sorting order
+            SpriteRenderer sr = card.GetComponent<SpriteRenderer>();
+            if (sr != null)
+            {
+                sr.sortingOrder = i;
+            }
+        }
+    }
+
+    private void UpdateCardPositions()
+    {
+        foreach (var kvp in cardTargetPositions)
+        {
+            GameObject card = kvp.Key;
+            Vector3 targetPos = kvp.Value;
+
+            if (card == null) continue;
+
+            // Smooth movement to target position
+            card.transform.position = Vector3.Lerp(
+                card.transform.position,
+                targetPos,
+                Time.deltaTime * cardMoveSpeed
+            );
+        }
+    }
+
+    public void RemoveCardFromBoard(GameObject card, bool isPlayerBoard, bool notifyServer = true)
+    {
+        if (card == null) return;
+
+        List<GameObject> cards = isPlayerBoard ? playerBoardCards : opponentBoardCards;
+
+        if (cards.Contains(card))
+        {
+            cards.Remove(card);
+            cardTargetPositions.Remove(card);
+            cardBoardIndices.Remove(card);
+
+            // Rearrange remaining cards
+            ArrangeCardsOnBoard(isPlayerBoard);
+
+            Debug.Log($"BOARD MANAGER || Removed card from {(isPlayerBoard ? "player" : "opponent")} board");
+
+            if (notifyServer && isPlayerBoard)
+            {
+                NotifyServerCardRemoved(card);
+            }
+        }
     }
 
     public void ReturnCardToHand(GameObject card)
     {
         if (card == null) return;
 
+        // Remove from both boards
+        RemoveCardFromBoard(card, true, notifyServer: false);
+        RemoveCardFromBoard(card, false, notifyServer: false);
+
+        // Return to hand
         if (CardManager.Instance != null)
         {
             Transform handZone = GameObject.Find("PlayerHandZone")?.transform;
             if (handZone != null)
             {
                 card.transform.SetParent(handZone);
-                card.transform.localPosition = Vector3.zero;
+                Debug.Log("BOARD MANAGER || Card returned to hand");
             }
         }
-
-        Debug.Log($"BOARD MANAGER || Card returned to hand");
     }
 
-    public List<GameObject> GetPlayerBoardCards()
+    public bool IsCardOnBoard(GameObject card, bool isPlayerBoard)
     {
-        List<GameObject> cards = new List<GameObject>();
-        foreach (var kvp in playerBoardCards)
-        {
-            if (kvp.Value != null)
-            {
-                cards.Add(kvp.Value);
-            }
-        }
-        return cards;
+        List<GameObject> cards = isPlayerBoard ? playerBoardCards : opponentBoardCards;
+        return cards.Contains(card);
     }
 
-    public List<GameObject> GetOpponentBoardCards()
+    public int GetCardCount(bool isPlayerBoard)
     {
-        List<GameObject> cards = new List<GameObject>();
-        foreach (var kvp in opponentBoardCards)
-        {
-            if (kvp.Value != null)
-            {
-                cards.Add(kvp.Value);
-            }
-        }
-        return cards;
+        List<GameObject> cards = isPlayerBoard ? playerBoardCards : opponentBoardCards;
+        return cards.Count;
     }
 
-    public GameObject GetCardInSlot(int slotIndex, bool isPlayerSlot)
+    public List<GameObject> GetBoardCards(bool isPlayerBoard)
     {
-        var dict = isPlayerSlot ? playerBoardCards : opponentBoardCards;
-        if (dict.TryGetValue(slotIndex, out GameObject card))
-        {
-            return card;
-        }
-        return null;
+        return isPlayerBoard ? new List<GameObject>(playerBoardCards) : new List<GameObject>(opponentBoardCards);
     }
 
-    public bool IsSlotOccupied(int slotIndex, bool isPlayerSlot)
+    public void ClearBoard(bool isPlayerBoard)
     {
-        return GetCardInSlot(slotIndex, isPlayerSlot) != null;
-    }
-
-    public void ClearBoard()
-    {
-        foreach (var slot in playerSlots)
-        {
-            if (slot != null)
-            {
-                slot.ClearSlot();
-            }
-        }
-
-        foreach (var slot in opponentSlots)
-        {
-            if (slot != null)
-            {
-                slot.ClearSlot();
-            }
-        }
-
-        playerBoardCards.Clear();
-        opponentBoardCards.Clear();
-
-        Debug.Log("BOARD MANAGER || Board cleared");
-    }
-
-    public void PlaceOpponentCard(int cardId, int slotIndex)
-    {
-        Debug.Log($"BOARD MANAGER || PlaceOpponentCard called - CardID: {cardId}, SlotIndex: {slotIndex}, OpponentSlots count: {opponentSlots.Count}");
+        List<GameObject> cards = isPlayerBoard ? playerBoardCards : opponentBoardCards;
         
-        if (slotIndex < 0 || slotIndex >= opponentSlots.Count)
+        foreach (GameObject card in cards)
         {
-            Debug.LogError($"BOARD MANAGER || Invalid slot index {slotIndex}. OpponentSlots count: {opponentSlots.Count}");
-            return;
+            if (card != null)
+            {
+                Destroy(card);
+            }
         }
 
-        BoardSlot targetSlot = opponentSlots[slotIndex];
-        if (targetSlot == null)
+        cards.Clear();
+        Debug.Log($"BOARD MANAGER || Cleared {(isPlayerBoard ? "player" : "opponent")} board");
+    }
+
+    public void ShowValidDropFeedback(bool isPlayerBoard)
+    {
+        SpriteRenderer renderer = isPlayerBoard ? playerZoneRenderer : opponentZoneRenderer;
+        if (renderer != null)
         {
-            Debug.LogError($"BOARD MANAGER || Target slot at index {slotIndex} is null!");
-            return;
+            StopAllCoroutines();
+            StartCoroutine(FlashZoneColor(renderer, validDropColor));
         }
+    }
 
-        Debug.Log($"BOARD MANAGER || Target slot found: {targetSlot.name}, SlotIndex property: {targetSlot.SlotIndex}");
+    public void ShowInvalidDropFeedback(bool isPlayerBoard)
+    {
+        SpriteRenderer renderer = isPlayerBoard ? playerZoneRenderer : opponentZoneRenderer;
+        if (renderer != null)
+        {
+            StopAllCoroutines();
+            StartCoroutine(FlashZoneColor(renderer, invalidDropColor));
+        }
+    }
 
+    private System.Collections.IEnumerator FlashZoneColor(SpriteRenderer renderer, Color flashColor)
+    {
+        Color original = renderer.color;
+        renderer.color = flashColor;
+        yield return new WaitForSeconds(0.3f);
+        renderer.color = original;
+    }
+
+    // Network integration points
+    private void NotifyServerCardPlaced(GameObject card)
+    {
+        CardVisual visual = card.GetComponent<CardVisual>();
+        if (visual == null) return;
+
+        int cardId = visual.CardID;
+        int index = playerBoardCards.IndexOf(card);
+
+        // Call your existing network RPC
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient)
+        {
+            var localPlayer = NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
+            if (localPlayer != null)
+            {
+                localPlayer.PlayCardToSlotServerRpc(cardId, index);
+            }
+        }
+    }
+
+    private void NotifyServerCardRemoved(GameObject card)
+    {
+        // Implement if you need server notification for card removal
+        Debug.Log("BOARD MANAGER || Card removed (network notification)");
+    }
+
+    public void PlaceOpponentCard(int cardId, int index)
+    {
         if (CardManager.Instance == null)
         {
-            Debug.LogError($"BOARD MANAGER || CardManager.Instance is null!");
+            Debug.LogError("BOARD MANAGER || CardManager.Instance is null!");
             return;
         }
 
-        // STEP 1: remove one card from opponent hand (since they played it)
+        // Remove one card from opponent hand
         CardManager.Instance.RemoveOneOpponentHandCard();
 
-        // STEP 2: clear the slot if already occupied (swap scenario)
-        if (targetSlot.IsOccupied)
-        {
-            Debug.Log($"BOARD MANAGER || Slot {slotIndex} already occupied, clearing it first");
-            targetSlot.ClearSlot();
-        }
-
-        // STEP 3: create the card object
+        // Create the card
         GameObject card = Instantiate(CardManager.Instance.GetCardPrefab());
         if (card != null)
         {
-            // initialize it as a revealed opponent card
             CardManager.Instance.InitializeCardVisual(card, cardId, true);
             
             CardDraggable draggable = card.GetComponent<CardDraggable>();
@@ -326,34 +414,93 @@ public class BoardManager : MonoBehaviour
                 draggable.enabled = false;
             }
             
-            // place it in the slot using the normal flow
-            targetSlot.PlaceCard(card);
+            TryPlaceCard(card, false, index);
             
-            Debug.Log($"BOARD MANAGER || Opponent placed card {cardId} in slot {slotIndex} (slot name: {targetSlot.name})");
+            Debug.Log($"BOARD MANAGER || Opponent placed card {cardId} at index {index}");
         }
-        else
+    }
+
+    // Helper to check if position is over a board zone
+    public bool IsPositionOverBoard(Vector3 worldPosition, out bool isPlayerBoard)
+    {
+        isPlayerBoard = true;
+
+        // Check player board with expanded bounds for easier dropping
+        if (playerBoardZone != null)
         {
-            Debug.LogError($"BOARD MANAGER || Failed to instantiate card prefab");
+            BoxCollider2D collider = playerBoardZone.GetComponent<BoxCollider2D>();
+            if (collider != null)
+            {
+                // Use bounds checking with slight expansion for easier dropping
+                Bounds bounds = collider.bounds;
+                bounds.Expand(0.5f); // Add 0.5 units of padding for easier drops
+                
+                if (bounds.Contains(worldPosition))
+                {
+                    isPlayerBoard = true;
+                    Debug.Log($"BOARD MANAGER || Position {worldPosition} is over PLAYER board");
+                    return true;
+                }
+            }
+            else
+            {
+                Debug.LogWarning("BOARD MANAGER || PlayerBoardZone missing BoxCollider2D!");
+            }
         }
-    }
 
-    public BoardSlot GetSlot(int slotIndex, bool isPlayerSlot)
-    {
-        var slots = isPlayerSlot ? playerSlots : opponentSlots;
-        if (slotIndex >= 0 && slotIndex < slots.Count)
+        // Check opponent board
+        if (opponentBoardZone != null)
         {
-            return slots[slotIndex];
+            BoxCollider2D collider = opponentBoardZone.GetComponent<BoxCollider2D>();
+            if (collider != null)
+            {
+                Bounds bounds = collider.bounds;
+                bounds.Expand(0.5f);
+                
+                if (bounds.Contains(worldPosition))
+                {
+                    isPlayerBoard = false;
+                    Debug.Log($"BOARD MANAGER || Position {worldPosition} is over OPPONENT board");
+                    return true;
+                }
+            }
+            else
+            {
+                Debug.LogWarning("BOARD MANAGER || OpponentBoardZone missing BoxCollider2D!");
+            }
         }
-        return null;
+
+        Debug.Log($"BOARD MANAGER || Position {worldPosition} is NOT over any board");
+        return false;
     }
 
-    public int GetPlayerCardCount()
+    // Debug visualization - shows board zones in Scene view
+    private void OnDrawGizmos()
     {
-        return playerBoardCards.Count;
-    }
-
-    public int GetOpponentCardCount()
-    {
-        return opponentBoardCards.Count;
+        if (playerBoardZone != null)
+        {
+            BoxCollider2D collider = playerBoardZone.GetComponent<BoxCollider2D>();
+            if (collider != null)
+            {
+                Gizmos.color = new Color(0, 1, 0, 0.3f); // Green for player board
+                Bounds bounds = collider.bounds;
+                bounds.Expand(0.5f); // Show expanded bounds
+                Gizmos.DrawCube(bounds.center, bounds.size);
+                Gizmos.DrawWireCube(bounds.center, bounds.size);
+            }
+        }
+        
+        if (opponentBoardZone != null)
+        {
+            BoxCollider2D collider = opponentBoardZone.GetComponent<BoxCollider2D>();
+            if (collider != null)
+            {
+                Gizmos.color = new Color(1, 0, 0, 0.3f); // Red for opponent board
+                Bounds bounds = collider.bounds;
+                bounds.Expand(0.5f);
+                Gizmos.DrawCube(bounds.center, bounds.size);
+                Gizmos.DrawWireCube(bounds.center, bounds.size);
+            }
+        }
     }
 }

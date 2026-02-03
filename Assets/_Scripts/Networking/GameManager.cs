@@ -2,7 +2,8 @@ using Unity.Netcode;
 using UnityEngine;
 using System.Collections.Generic;
 
-public class GameManager : NetworkBehaviour {
+public class GameManager : NetworkBehaviour
+{
 	public static GameManager Instance;
 
 	public enum GamePhase { ResourceGain, Planning, Reveal, Cleanup }
@@ -13,33 +14,40 @@ public class GameManager : NetworkBehaviour {
 	[SerializeField] private float revealPhaseDuration = 3f;
 	[SerializeField] private float cleanupPhaseDuration = 2f;
 
-	private void Awake() {
+	private void Awake()
+	{
 		if (Instance == null) Instance = this;
 		else Destroy(gameObject);
 	}
 
-	public override void OnNetworkSpawn() {
-		if (IsServer) {
+	public override void OnNetworkSpawn()
+	{
+		if (IsServer)
+		{
 			CurrentPhase.OnValueChanged += OnPhaseChanged;
 
-			if (CurrentPhase.Value == GamePhase.ResourceGain) {
+			if (CurrentPhase.Value == GamePhase.ResourceGain)
+			{
 				StartCoroutine(ProcessResourceGain());
 			}
 		}
 
 		// clients also listen to phase changes for UI updates
-		if (IsClient && !IsServer) {
+		if (IsClient && !IsServer)
+		{
 			CurrentPhase.OnValueChanged += OnPhaseChangedClient;
 		}
 	}
 
-	private void OnPhaseChanged(GamePhase oldPhase, GamePhase newPhase) {
+	private void OnPhaseChanged(GamePhase oldPhase, GamePhase newPhase)
+	{
 		if (!IsServer) return;
 
 		Debug.Log($"GAME MANAGER || Phase changed: {oldPhase} -> {newPhase}");
 
 		// automatically process each phase on the server
-		switch (newPhase) {
+		switch (newPhase)
+		{
 			case GamePhase.ResourceGain:
 				StartCoroutine(ProcessResourceGain());
 				break;
@@ -55,15 +63,18 @@ public class GameManager : NetworkBehaviour {
 		}
 	}
 
-	private void OnPhaseChangedClient(GamePhase oldPhase, GamePhase newPhase) {
+	private void OnPhaseChangedClient(GamePhase oldPhase, GamePhase newPhase)
+	{
 		Debug.Log($"GAME MANAGER || Client sees phase change: {oldPhase} -> {newPhase}");
 	}
 
-	private System.Collections.IEnumerator ProcessResourceGain() {
+	private System.Collections.IEnumerator ProcessResourceGain()
+	{
 		Debug.Log("GAME MANAGER || === RESOURCE GAIN PHASE ===");
 		
 		// wait for both players to connect
-		while (NetworkManager.Singleton.ConnectedClientsList.Count < 2) {
+		while (NetworkManager.Singleton.ConnectedClientsList.Count < 2)
+		{
 			yield return new WaitForSeconds(0.5f);
 		}
 
@@ -72,8 +83,10 @@ public class GameManager : NetworkBehaviour {
 		yield return new WaitForSeconds(0.5f);
 
 		// give each player resources for the new turn
-		foreach (var client in NetworkManager.Singleton.ConnectedClientsList) {
-			if (client.PlayerObject.TryGetComponent<PlayerNetwork>(out var player)) {
+		foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+		{
+			if (client.PlayerObject.TryGetComponent<PlayerNetwork>(out var player))
+			{
 				player.StartNewTurnServer(); // reset AP to 5, add +1 mana, set IsReady = false
 				player.ExecuteDrawServer(isFree: true); // blind draw 1 card (doesn't cost AP)
 			}
@@ -88,7 +101,8 @@ public class GameManager : NetworkBehaviour {
 	}
 
 	[Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
-	public void CheckPlayersReadyServerRpc() {
+	public void CheckPlayersReadyServerRpc()
+	{
 		if (!IsServer) return;
 
 		// only check ready status during planning phase
@@ -96,8 +110,10 @@ public class GameManager : NetworkBehaviour {
 
 		int readyCount = 0;
 		
-		foreach (var client in NetworkManager.Singleton.ConnectedClientsList) {
-			if (client.PlayerObject.TryGetComponent<PlayerNetwork>(out var player)) {
+		foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+		{
+			if (client.PlayerObject.TryGetComponent<PlayerNetwork>(out var player))
+			{
 				if (player.IsPlayerReady()) {
 					readyCount++;
 				}
@@ -107,12 +123,14 @@ public class GameManager : NetworkBehaviour {
 		Debug.Log($"GAME MANAGER || Ready check: {readyCount}/2 players ready");
 
 		// both players ready - move to reveal phase
-		if (readyCount >= 2) {
+		if (readyCount >= 2)
+		{
 			CurrentPhase.Value = GamePhase.Reveal;
 		}
 	}
 
-	private System.Collections.IEnumerator ProcessReveal() {
+	private System.Collections.IEnumerator ProcessReveal()
+	{
 		Debug.Log("GAME MANAGER || === REVEAL PHASE ===");
 		
 		// reveal all cards on both boards
@@ -127,7 +145,8 @@ public class GameManager : NetworkBehaviour {
 		CurrentPhase.Value = GamePhase.Cleanup;
 	}
 
-	private System.Collections.IEnumerator ProcessCleanup() {
+	private System.Collections.IEnumerator ProcessCleanup()
+	{
 		Debug.Log("GAME MANAGER || === CLEANUP PHASE ===");
 
 		// check for exhausted cards (cards with 0 charges)
@@ -136,7 +155,8 @@ public class GameManager : NetworkBehaviour {
 		// check for win condition
 		bool gameEnded = CheckWinCondition();
 		
-		if (gameEnded) {
+		if (gameEnded)
+		{
 			Debug.Log("GAME MANAGER || Game ended!");
 			yield break;
 		}
@@ -147,10 +167,13 @@ public class GameManager : NetworkBehaviour {
 		CurrentPhase.Value = GamePhase.ResourceGain;
 	}
 
-	private bool CheckWinCondition() {
+	private bool CheckWinCondition()
+	{
 		// check if any player has HP <= 0
-		foreach (var client in NetworkManager.Singleton.ConnectedClientsList) {
-			if (client.PlayerObject.TryGetComponent<PlayerNetwork>(out var player)) {
+		foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+		{
+			if (client.PlayerObject.TryGetComponent<PlayerNetwork>(out var player))
+			{
 				if (player.GetCurrentHealth() <= 0) {
 					// TODO: Implement proper win/loss handling
 					Debug.Log($"GAME MANAGER || Player {player.OwnerClientId} has been defeated!");
@@ -162,12 +185,14 @@ public class GameManager : NetworkBehaviour {
 	}
 
 	[ClientRpc]
-	private void NotifyPlanningPhaseStartClientRpc() {
+	private void NotifyPlanningPhaseStartClientRpc()
+	{
 		Debug.Log("GAME MANAGER || === PLANNING PHASE === Take your actions!");
 	}
 
 	[ClientRpc]
-	private void RevealBoardsClientRpc() {
+	private void RevealBoardsClientRpc()
+	{
 		Debug.Log("GAME MANAGER || Revealing boards...");
 		// TODO: Trigger visual effects, reveal opponent cards, etc.
 		
@@ -178,7 +203,8 @@ public class GameManager : NetworkBehaviour {
 	}
 
 	[ClientRpc]
-	private void CleanupExhaustedCardsClientRpc() {
+	private void CleanupExhaustedCardsClientRpc()
+	{
 		Debug.Log("GAME MANAGER || Cleaning up exhausted cards...");
 		
 		// TODO: Remove cards with 0 charges from the board
@@ -187,23 +213,29 @@ public class GameManager : NetworkBehaviour {
 		}
 	}
 
-	public bool CanPlayCards() {
+	public bool CanPlayCards()
+	{
 		return CurrentPhase.Value == GamePhase.Planning;
 	}
 
-	public bool CanDrawCards() {
+	public bool CanDrawCards()
+	{
 		return CurrentPhase.Value == GamePhase.Planning;
 	}
 
-	public bool CanAttack() {
+	public bool CanAttack()
+	{
 		return CurrentPhase.Value == GamePhase.Planning;
 	}
 
-	public override void OnNetworkDespawn() {
-		if (IsServer) {
+	public override void OnNetworkDespawn()
+	{
+		if (IsServer)
+		{
 			CurrentPhase.OnValueChanged -= OnPhaseChanged;
 		}
-		if (IsClient && !IsServer) {
+		if (IsClient && !IsServer)
+		{
 			CurrentPhase.OnValueChanged -= OnPhaseChangedClient;
 		}
 	}

@@ -4,14 +4,24 @@ using Unity.Netcode;
 
 public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
 {
+    [Header("Debug")]
+    [SerializeField] private bool skipNetworkChecks = false;
+
     [Header("Drag Settings")]
-    [SerializeField] private float dragSpeed = 20f;
-    [SerializeField] private LayerMask boardSlotLayer;
+    // [SerializeField] private float dragSpeed = 30f;
     
     [Header("Visual Feedback")]
     [SerializeField] private Color selectedColor = new Color(1f, 1f, 0.5f, 1f);
     [SerializeField] private Color cannotPlayColor = new Color(1f, 0.3f, 0.3f, 1f);
-    [SerializeField] private Vector3 selectedScale = new Vector3(1.1f, 1.1f, 1f);
+    [SerializeField] private Vector3 selectedScale = new Vector3(1.2f, 1.2f, 1f);
+    
+    [Header("Pivot Settings")]
+    [SerializeField] private float maxTiltAngle = 15f; // Maximum rotation angle
+    [SerializeField] private float tiltSpeed = 5f; // How fast it rotates
+    [SerializeField] private bool enablePivot = true; // Toggle on/off
+
+    private Vector3 lastPosition;
+    private Quaternion originalRotation;
     
     private Vector3 originalPosition;
     private Transform originalParent;
@@ -19,47 +29,41 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     private Color originalColor;
     private bool isDragging;
     private bool isSelected;
-    private Canvas canvas;
-    private SpriteRenderer spriteRenderer;
-    private BoardSlot currentSlot;
+    private bool isOnBoard;
     
-    // static reference to currently selected card (for click-to-place)
+    private SpriteRenderer cardBackgroundRenderer;
+    private CardVisual cardVisual;
+    
     public static CardDraggable SelectedCard { get; private set; }
 
-    public BoardSlot CurrentSlot => currentSlot;
     public bool IsDragging => isDragging;
     public bool IsSelected => isSelected;
+    public bool IsOnBoard => isOnBoard;
 
     private void Awake()
     {
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        if (spriteRenderer != null)
+        cardVisual = GetComponent<CardVisual>();
+        cardBackgroundRenderer = GetComponent<SpriteRenderer>();
+        
+        if (cardBackgroundRenderer != null)
         {
-            originalColor = spriteRenderer.color;
+            originalColor = cardBackgroundRenderer.color;
         }
         originalScale = transform.localScale;
-    }
-
-    private void Start()
-    {
-        canvas = FindFirstObjectByType<Canvas>();
+        originalRotation = transform.localRotation;
     }
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        // don't allow clicking if card is being dragged
         if (isDragging) return;
-
         if (!IsPlayerCard()) return;
 
-        // check if card can be played before allowing selection
         if (!CanBePlayed())
         {
             ShowCannotPlayFeedback();
             return;
         }
 
-        // toggle selection
         if (isSelected)
         {
             DeselectCard();
@@ -80,13 +84,12 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         isSelected = true;
         SelectedCard = this;
         
-        if (spriteRenderer != null)
+        if (cardBackgroundRenderer != null)
         {
-            spriteRenderer.color = selectedColor;
+            cardBackgroundRenderer.color = selectedColor;
         }
-        transform.localScale = selectedScale;
 
-        Debug.Log($"CARD DRAGGABLE || Card selected for placement");
+        Debug.Log($"CARD DRAGGABLE || Card selected");
     }
 
     public void DeselectCard()
@@ -99,11 +102,10 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             SelectedCard = null;
         }
 
-        if (spriteRenderer != null)
+        if (cardBackgroundRenderer != null)
         {
-            spriteRenderer.color = originalColor;
+            cardBackgroundRenderer.color = originalColor;
         }
-        transform.localScale = originalScale;
 
         Debug.Log($"CARD DRAGGABLE || Card deselected");
     }
@@ -112,18 +114,16 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     {   
         if (!IsPlayerCard()) 
         {
-            Debug.Log($"CARD DRAGGABLE || Drag blocked - not a player card. Parent: {transform.parent?.name}");
+            Debug.Log($"CARD DRAGGABLE || Drag blocked - not a player card");
             return;
         }
 
-        // check if card can be played before allowing drag
         if (!CanBePlayed())
         {
             ShowCannotPlayFeedback();
             return;
         }
 
-        // deselect if selected
         if (isSelected)
         {
             DeselectCard();
@@ -132,14 +132,23 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         isDragging = true;
         originalPosition = transform.position;
         originalParent = transform.parent;
+        lastPosition = transform.position;
 
-        // move card to top of render order while dragging
-        if (spriteRenderer != null)
+        // Remember if card was on board
+        if (BoardManager.Instance != null)
         {
-            spriteRenderer.sortingOrder = 100;
+            isOnBoard = BoardManager.Instance.IsCardOnBoard(gameObject, true);
         }
 
-        Debug.Log($"CARD DRAGGABLE || Started dragging card");
+        if (cardBackgroundRenderer != null)
+        {
+            cardBackgroundRenderer.sortingOrder = 200;
+        }
+
+        // Slightly enlarge while dragging
+        transform.localScale = originalScale * 1.15f;
+
+        Debug.Log($"CARD DRAGGABLE || Started dragging");
     }
 
     public void OnDrag(PointerEventData eventData)
@@ -149,125 +158,177 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         Vector3 mousePosition = Camera.main.ScreenToWorldPoint(eventData.position);
         mousePosition.z = 0;
 
-        transform.position = Vector3.Lerp(transform.position, mousePosition, dragSpeed * Time.deltaTime);
+        // Use instant positioning instead of lerp for more responsive dragging
+        // This ensures the card is exactly where the mouse is when dropped
+        transform.position = mousePosition;
+        
+        // TILT/PIVOT EFFECT
+        if (enablePivot)
+        {
+            // Calculate movement direction
+            Vector3 movement = transform.position - lastPosition;
+            
+            if (movement.magnitude > 0.001f) // Only tilt if actually moving
+            {
+                // Calculate tilt angle based on horizontal movement
+                float tiltAngle = Mathf.Clamp(movement.x * maxTiltAngle * 100f, -maxTiltAngle, maxTiltAngle);
+                
+                // Create target rotation
+                Quaternion targetRotation = Quaternion.Euler(0, 0, -tiltAngle);
+                
+                // Smoothly rotate toward target
+                transform.localRotation = Quaternion.Lerp(
+                    transform.localRotation, 
+                    targetRotation, 
+                    tiltSpeed * Time.deltaTime
+                );
+            }
+            
+            lastPosition = transform.position;
+        }
+
+        // Show visual feedback for valid/invalid drop zones
+        if (BoardManager.Instance != null)
+        {
+            if (BoardManager.Instance.IsPositionOverBoard(transform.position, out bool isPlayerBoard))
+            {
+                if (isPlayerBoard)
+                {
+                    // Check if we can place here
+                    if (BoardManager.Instance.CanPlaceCardOnBoard(true) || isOnBoard)
+                    {
+                        BoardManager.Instance.ShowValidDropFeedback(true);
+                    }
+                    else
+                    {
+                        BoardManager.Instance.ShowInvalidDropFeedback(true);
+                    }
+                }
+            }
+        }
     }
 
     public void OnEndDrag(PointerEventData eventData)
     {
         if (!isDragging)
         {
-            Debug.Log($"CARD DRAGGABLE || OnEndDrag called but isDragging is false");
             return;
         }
         
         isDragging = false;
+        
+        // Reset scale and rotation
+        transform.localScale = originalScale;
+        transform.localRotation = originalRotation;
 
-        if (spriteRenderer != null)
+        if (cardBackgroundRenderer != null)
         {
-            spriteRenderer.sortingOrder = 0;
+            cardBackgroundRenderer.sortingOrder = 0;
         }
 
-        Debug.Log($"CARD DRAGGABLE || End drag at screen pos: {eventData.position}");
-        BoardSlot targetSlot = GetSlotUnderMouse(eventData.position);
+        // IMPORTANT: Use the card's actual position, not mouse position
+        // This is more accurate because of the lerp delay
+        Vector3 dropPosition = transform.position;
+        dropPosition.z = 0;
 
-        if (targetSlot != null)
+        Debug.Log($"CARD DRAGGABLE || Drop position: {dropPosition}");
+
+        // Check if dropped on board area
+        if (BoardManager.Instance != null)
         {
-            Debug.Log($"CARD DRAGGABLE || Found slot: {targetSlot.name}, IsPlayerSlot: {targetSlot.IsPlayerSlot}");
-            
-            if (targetSlot.IsPlayerSlot)
+            if (BoardManager.Instance.IsPositionOverBoard(dropPosition, out bool isPlayerBoard))
             {
-                // double-check we can still play the card
-                if (!CanBePlayed())
-                {
-                    Debug.Log($"CARD DRAGGABLE || Cannot play card - insufficient resources or wrong phase");
-                    ShowCannotPlayFeedback();
-                    ReturnToOriginalPosition();
-                    return;
-                }
-
-                // valid drop - place card in slot
-                if (currentSlot != null)
-                {
-                    currentSlot.RemoveCard();
-                }
+                Debug.Log($"CARD DRAGGABLE || Over board zone: {(isPlayerBoard ? "Player" : "Opponent")}");
                 
-                targetSlot.TryPlaceCard(gameObject);
+                if (isPlayerBoard)
+                {
+                    // Try to place on player board
+                    if (TryPlaceOnBoard())
+                    {
+                        Debug.Log("CARD DRAGGABLE || Card placed on board successfully");
+                        return;
+                    }
+                    else
+                    {
+                        Debug.Log("CARD DRAGGABLE || Failed to place on board, returning to hand");
+                    }
+                }
+                else
+                {
+                    Debug.Log("CARD DRAGGABLE || Cannot place on opponent board");
+                }
             }
             else
             {
-                Debug.Log($"CARD DRAGGABLE || Slot is opponent slot, can't place here");
-                ReturnToOriginalPosition();
+                Debug.Log("CARD DRAGGABLE || Not over any board zone");
             }
         }
         else
         {
-            Debug.Log($"CARD DRAGGABLE || No slot found, returning to hand");
-            // invalid drop - return to original position
-            ReturnToOriginalPosition();
+            Debug.LogError("CARD DRAGGABLE || BoardManager.Instance is null!");
         }
+
+        // Return to original position
+        ReturnToOriginalPosition();
     }
 
-    private BoardSlot GetSlotUnderMouse(Vector2 screenPosition)
+    private bool TryPlaceOnBoard()
     {
-        Vector3 worldPosition = Camera.main.ScreenToWorldPoint(screenPosition);
-        worldPosition.z = 0;
+        if (BoardManager.Instance == null) return false;
 
-        Debug.Log($"CARD DRAGGABLE || Raycast from world pos: {worldPosition}");
-        Debug.Log($"CARD DRAGGABLE || Layer mask value: {boardSlotLayer.value}");
+        // Validation check
+        if (!CanBePlayed())
+        {
+            ShowCannotPlayFeedback();
+            return false;
+        }
+
+        // Try to place card
+        bool placed = BoardManager.Instance.TryPlaceCard(gameObject, true);
         
-        RaycastHit2D hit2d;
-        if (boardSlotLayer != 0)
+        if (placed)
         {
-            hit2d = Physics2D.Raycast(worldPosition, Vector2.zero, Mathf.Infinity, boardSlotLayer);
-        }
-        else
-        {
-            hit2d = Physics2D.Raycast(worldPosition, Vector2.zero);
-        }
-
-        if (hit2d.collider != null)
-        {
-            Debug.Log($"CARD DRAGGABLE || Found slot: {hit2d.collider.name}");
-            return hit2d.collider.GetComponent<BoardSlot>();
+            isOnBoard = true;
+            
+            // Remove from hand tracking
+            if (CardManager.Instance != null)
+            {
+                CardManager.Instance.RemoveCardFromHand(gameObject);
+            }
         }
 
-        Debug.Log($"CARD DRAGGABLE || No slot hit with layer mask");
-        return null;
+        return placed;
     }
 
     private void ReturnToOriginalPosition()
     {
-        if (currentSlot != null)
+        if (isOnBoard && BoardManager.Instance != null)
         {
-            // card was already on board - return to slot
-            transform.SetParent(currentSlot.transform);
-            transform.localPosition = Vector3.zero;
+            // Was on board, return to board
+            BoardManager.Instance.TryPlaceCard(gameObject, true);
         }
         else if (originalParent != null)
         {
-            // card was in hand - return to hand
+            // Was in hand, return to hand
             transform.SetParent(originalParent);
-            transform.position = originalPosition;
+            // CardManager will handle repositioning
         }
 
         Debug.Log($"CARD DRAGGABLE || Card returned to original position");
     }
 
-    public void SetCurrentSlot(BoardSlot slot)
-    {
-        currentSlot = slot;
-    }
-
     public bool CanBePlayed()
     {
-        // 1. CHECK PHASE - can only play during planning phase
+        if (skipNetworkChecks) return true;
+
+        // 1. PHASE CHECK
         if (GameManager.Instance == null || !GameManager.Instance.CanPlayCards())
         {
             Debug.Log($"CARD DRAGGABLE || Cannot play - not in Planning phase");
             return false;
         }
 
-        // 2. GET PLAYER REFERENCE
+        // 2. PLAYER REFERENCE
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsClient)
         {
             return false;
@@ -279,15 +340,14 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             return false;
         }
 
-        // 3. CHECK ACTION POINTS - need at least 1 AP to play
+        // 3. ACTION POINTS CHECK
         if (localPlayer.GetCurrentActionPoints() <= 0)
         {
-            Debug.Log($"CARD DRAGGABLE || Cannot play - no AP remaining (0/5)");
+            Debug.Log($"CARD DRAGGABLE || Cannot play - no AP remaining");
             return false;
         }
 
-        // 4. CHECK MANA COST
-        CardVisual cardVisual = GetComponent<CardVisual>();
+        // 4. MANA COST CHECK
         if (cardVisual == null) return false;
 
         if (CardManager.Instance != null && CardManager.Instance.GetCardLibrary() != null)
@@ -298,7 +358,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             int currentMana = localPlayer.GetCurrentMana();
             if (currentMana < cardData.manaCost)
             {
-                Debug.Log($"CARD DRAGGABLE || Cannot play - not enough mana (need {cardData.manaCost}, have {currentMana})");
+                Debug.Log($"CARD DRAGGABLE || Cannot play - not enough mana");
                 return false;
             }
         }
@@ -308,8 +368,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     private void ShowCannotPlayFeedback()
     {
-        // flash red to indicate cannot play
-        if (spriteRenderer != null)
+        if (cardBackgroundRenderer != null)
         {
             StartCoroutine(FlashCannotPlay());
         }
@@ -317,30 +376,26 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     private System.Collections.IEnumerator FlashCannotPlay()
     {
-        Color original = spriteRenderer.color;
-        spriteRenderer.color = cannotPlayColor;
-        yield return new WaitForSeconds(0.2f);
-        spriteRenderer.color = original;
-    }
+        Color original = cardBackgroundRenderer.color;
+        cardBackgroundRenderer.color = cannotPlayColor;
+        
+        Vector3 originalPos = transform.localPosition;
+        float shakeAmount = 0.1f;
+        float shakeDuration = 0.2f;
+        float elapsed = 0f;
 
-    public void PlayCard()
-    {
-        CardVisual cardVisual = GetComponent<CardVisual>();
-        if (cardVisual == null) return;
-
-        int cardId = cardVisual.CardID;
-        int slotIndex = currentSlot != null ? currentSlot.SlotIndex : -1;
-        Debug.Log($"CARD DRAGGABLE || Playing card {cardId} to slot {slotIndex}");
-
-        // notify server that this card was played
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient)
+        while (elapsed < shakeDuration)
         {
-            var localPlayer = NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
-            if (localPlayer != null)
-            {
-                localPlayer.PlayCardToSlotServerRpc(cardVisual.CardID, slotIndex);
-            }
+            float x = originalPos.x + Random.Range(-shakeAmount, shakeAmount);
+            float y = originalPos.y + Random.Range(-shakeAmount, shakeAmount);
+            transform.localPosition = new Vector3(x, y, originalPos.z);
+            
+            elapsed += Time.deltaTime;
+            yield return null;
         }
+
+        transform.localPosition = originalPos;
+        cardBackgroundRenderer.color = original;
     }
 
     private void OnDestroy()
@@ -353,38 +408,26 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     private bool IsPlayerCard()
     {
-        // check if this component is even enabled (opponent cards have this disabled)
-        if (!enabled)
-        {
-            Debug.Log($"CARD DRAGGABLE || IsPlayerCard check - component is disabled");
-            return false;
-        }
+        if (!enabled) return false;
 
         Transform parent = transform.parent;
         if (parent != null)
         {
-            // check if in player hand zone
-            if (parent.name == "PlayerHandZone")
-            {
-                Debug.Log($"CARD DRAGGABLE || IsPlayerCard check - in PlayerHandZone: TRUE");
-                return true;
-            }
-            
-            // check if parent is a player slot
-            BoardSlot slot = parent.GetComponent<BoardSlot>();
-            if (slot != null)
-            {
-                Debug.Log($"CARD DRAGGABLE || IsPlayerCard check - in BoardSlot, IsPlayerSlot: {slot.IsPlayerSlot}");
-                return slot.IsPlayerSlot;
-            }
-
-            Debug.Log($"CARD DRAGGABLE || IsPlayerCard check - parent is '{parent.name}': FALSE");
+            if (parent.name == "PlayerHandZone") return true;
+            if (parent.name == "PlayerBoardZone") return true;
         }
-        else
+        
+        // Check if on player board
+        if (BoardManager.Instance != null)
         {
-            Debug.Log($"CARD DRAGGABLE || IsPlayerCard check - no parent: FALSE");
+            return BoardManager.Instance.IsCardOnBoard(gameObject, true);
         }
         
         return false;
+    }
+
+    public void SetOnBoard(bool onBoard)
+    {
+        isOnBoard = onBoard;
     }
 }
