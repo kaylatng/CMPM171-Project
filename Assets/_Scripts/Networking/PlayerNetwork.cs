@@ -1,3 +1,4 @@
+using System;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -20,6 +21,12 @@ public class PlayerNetwork : NetworkBehaviour {
 			PlayerName = "Placeholder Name",
 		}, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server
 	);
+
+	public event Action<PlayerData> OnPlayerDataChanged;
+
+	public int GetHP() { return playerData.Value.Health; }
+	public int GetMana() { return playerData.Value.Mana; }
+	public int GetAP() { return playerData.Value.ActionPoints; }
 
 	public struct PlayerData : INetworkSerializable {
 		public int Health;
@@ -51,6 +58,7 @@ public class PlayerNetwork : NetworkBehaviour {
 		
 		playerData.OnValueChanged += (PlayerData previousValue, PlayerData newValue) => {
 			Debug.Log(OwnerClientId + "; " + newValue.Health + "; " + newValue.IsReady + "; " + newValue.PlayerName + "; Cards in hand: " + newValue.CardsInHandCount);
+			OnPlayerDataChanged?.Invoke(newValue);
 		};
 	}
 
