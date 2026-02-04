@@ -231,7 +231,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 1.3, y: 1.8}
   m_EdgeRadius: 0
 --- !u!114 &9142348968837964947
 MonoBehaviour:
@@ -267,6 +267,7 @@ MonoBehaviour:
   selectedScale: {x: 1.1, y: 1.1, z: 1}
   maxTiltAngle: 15
   tiltSpeed: 5
+  returnToNeutralSpeed: 6
   enablePivot: 1
 --- !u!114 &-3715203801737266431
 MonoBehaviour:
@@ -292,6 +293,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3dee5b86e0d4dfb46a8bb4bc87ae98d0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CardShadow
+  shadowColor: {r: 0, g: 0, b: 0, a: 0.3}
+  shadowOffset: {x: 0.15, y: -0.15, z: 0.05}
+  dragShadowOffset: {x: 0.2, y: -0.2, z: 0.05}
+  shadowScale: {x: 1.05, y: 1.05, z: 1}
+  interpolationSpeed: 8
+  dragInterpolationSpeed: 4
+  showInHand: 0
+  showWhenDragging: 1
+  showOnBoard: 1
 --- !u!1 &3776071034082901224
 GameObject:
   m_ObjectHideFlags: 0
@@ -317,7 +327,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3776071034082901224}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0

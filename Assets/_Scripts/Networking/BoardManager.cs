@@ -107,7 +107,7 @@ public class BoardManager : MonoBehaviour
             if (collider == null)
             {
                 collider = playerBoardZone.gameObject.AddComponent<BoxCollider2D>();
-                collider.size = new Vector2(1f, 1f); // Wide enough for 3 cards
+                collider.size = new Vector2(8f, 1f); // Wide enough for 3 cards
             }
         }
 
@@ -119,6 +119,7 @@ public class BoardManager : MonoBehaviour
                 opponentZoneRenderer = opponentBoardZone.gameObject.AddComponent<SpriteRenderer>();
                 opponentZoneRenderer.sprite = CreateZoneSprite();
                 opponentZoneRenderer.sortingOrder = -10;
+
             }
             opponentZoneRenderer.color = normalZoneColor;
 
@@ -126,7 +127,7 @@ public class BoardManager : MonoBehaviour
             if (collider == null)
             {
                 collider = opponentBoardZone.gameObject.AddComponent<BoxCollider2D>();
-                collider.size = new Vector2(1f, 1f);
+                collider.size = new Vector2(8f, 1f);
             }
         }
     }
