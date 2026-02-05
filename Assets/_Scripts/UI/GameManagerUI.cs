@@ -16,6 +16,7 @@ public class GameManagerUI : MonoBehaviour
 	[SerializeField] private TextMeshProUGUI apText;
 	[SerializeField] private TextMeshProUGUI manaText;
 	[SerializeField] private TextMeshProUGUI healthText;
+	[SerializeField] private TextMeshProUGUI hpText;
 	
 	[Header("Opponent Status")]
 	[SerializeField] private TextMeshProUGUI opponentStatusText;
@@ -110,6 +111,10 @@ public class GameManagerUI : MonoBehaviour
 			if (readyBtnText != null)
 			{
 				readyBtnText.text = "READY";
+			}
+			if (localPlayer != null) {
+    			localPlayer.OnPlayerDataChanged += HandlePlayerDataChanged;
+    			HandlePlayerDataChanged(default); // initial draw
 			}
 		}
 	}
@@ -256,5 +261,19 @@ public class GameManagerUI : MonoBehaviour
 			GameManager.Instance.CurrentPhase.OnValueChanged -= OnPhaseChanged;
 			GameManager.Instance.CurrentRound.OnValueChanged -= OnRoundChanged;
 		}
+		if (localPlayer != null)
+    	localPlayer.OnPlayerDataChanged -= HandlePlayerDataChanged;
+
 	}
+
+	private void HandlePlayerDataChanged(PlayerNetwork.PlayerData data) {
+		if (manaText != null) manaText.text = $"Mana: {localPlayer.GetMana()}";
+		if (apText != null) apText.text = $"AP: {localPlayer.GetAP()}/5";
+		if (hpText != null) hpText.text = $"HP: {localPlayer.GetHP()}";
+	}
+
+
+	//public void UpdateResourceUI(int ap, int hp) {
+		// apText.text = $"AP: {ap}/5";
+	//}
 }

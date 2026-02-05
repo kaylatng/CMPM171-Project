@@ -5,6 +5,8 @@ public class DeckManager : MonoBehaviour
 {
     public static DeckManager Instance;
 
+    public CardLibrary cardLibrary;
+
     private List<int> masterDeck = new List<int>();
 
     private void Awake()
