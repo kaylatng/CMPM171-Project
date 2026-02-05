@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5537238977664348224}
   - component: {fileID: 4167609983181074220}
-  m_Layer: 6
+  m_Layer: 8
   m_Name: CardFace
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -105,7 +105,7 @@ GameObject:
   - component: {fileID: 65603005142070742}
   - component: {fileID: -3715203801737266431}
   - component: {fileID: 4358204892944696534}
-  m_Layer: 6
+  m_Layer: 8
   m_Name: CardPrefab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -267,7 +267,6 @@ MonoBehaviour:
   selectedScale: {x: 1.1, y: 1.1, z: 1}
   maxTiltAngle: 15
   tiltSpeed: 5
-  returnToNeutralSpeed: 6
   enablePivot: 1
 --- !u!114 &-3715203801737266431
 MonoBehaviour:
@@ -312,7 +311,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8926942537742115723}
   - component: {fileID: 7132849791362157011}
-  m_Layer: 6
+  m_Layer: 8
   m_Name: Square
   m_TagString: Untagged
   m_Icon: {fileID: 0}

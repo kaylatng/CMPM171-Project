@@ -11,22 +11,37 @@ public class CardVisual : MonoBehaviour
     public void Initialize(int id, CardData data)
     {
         CardID = id;
+
+        if (cardRenderer != null)
+        {
+            cardRenderer.sortingOrder = 0; // Background layer
+        }
+        
+        if (faceRenderer != null)
+        {
+            faceRenderer.sortingOrder = 1; // Face layer (above background)
+        }
+        
         if (data != null)
         {
-            // Set text from data
-            // nameText.text = data.cardName;
-
-            // Set the unique card image
             if (faceRenderer != null)
             {
-                faceRenderer.sprite = data.cardArt; 
+                faceRenderer.sprite = data.cardArt;
             }
-
-            // Apply theme color
-            cardRenderer.color = data.themeColor;
-        } else {
+            
+            // Apply theme color to background
+            if (cardRenderer != null)
+            {
+                cardRenderer.color = data.themeColor;
+            }
+        }
+        else
+        {
             // Fallback if data is missing
-            cardRenderer.color = (id >= 60) ? Color.yellow : Color.white;
+            if (cardRenderer != null)
+            {
+                cardRenderer.color = (id >= 60) ? Color.yellow : Color.white;
+            }
         }
     }
 }
