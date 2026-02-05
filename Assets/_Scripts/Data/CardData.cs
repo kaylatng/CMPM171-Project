@@ -24,9 +24,6 @@ public class CardData : ScriptableObject
 	public Sprite cardArt;       // art goes here
 	public Color themeColor;     // placeholder
 
-	[Header("Progression")]
-	public CardData nextTier;    // link to the next version
-
 	[TextArea]
 	public string description;   // "create 1 tier copy" or "the cupid guides you" etc...
 }
