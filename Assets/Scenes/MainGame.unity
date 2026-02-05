@@ -332,6 +332,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3e1b7e559081caa40852bf01eb493f74, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BoardManager
+  library: {fileID: 11400000, guid: d6c28565e4e0aef44a1c70044750072c, type: 2}
   maxCardsPerBoard: 3
   playerBoardZone: {fileID: 1021734395}
   opponentBoardZone: {fileID: 845152870}

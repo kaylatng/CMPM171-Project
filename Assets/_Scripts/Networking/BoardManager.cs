@@ -6,6 +6,8 @@ public class BoardManager : MonoBehaviour
 {
     public static BoardManager Instance;
 
+    [SerializeField] private CardLibrary library;
+
     [Header("Board Settings")]
     [SerializeField] private int maxCardsPerBoard = 3;
     
@@ -196,6 +198,44 @@ public class BoardManager : MonoBehaviour
         ArrangeCardsOnBoard(isPlayerCard);
 
         Debug.Log($"BOARD MANAGER || Placed card on {(isPlayerCard ? "player" : "opponent")} board ({targetBoard.Count}/{maxCardsPerBoard})");
+
+        List<GameObject> currentBoard = isPlayerCard ? playerBoardCards : opponentBoardCards;
+        string idListString = isPlayerCard ? "Player Card IDs: " : "Opponent Card IDs: ";
+
+        HashSet<int> seenIds = new HashSet<int>();
+        bool mergeFound = false;
+
+        for (int i = 0; i < currentBoard.Count; i++) 
+        {
+            // 1. Get the Visual component from the GameObject
+            CardVisual visual = currentBoard[i].GetComponent<CardVisual>();
+
+            if (visual != null) 
+            {
+                // 2. Get the Pool ID (the raw ID of the card)
+                int poolId = visual.CardID; 
+
+                // 3. Use your Library's math to get the Asset ID (100, 200, etc.)
+                int assetId = library.GetMappedAssetID(poolId);
+
+                if (seenIds.Contains(assetId)) {
+                    mergeFound = true;
+                }
+                seenIds.Add(assetId);
+
+                idListString += $"{assetId}";
+                
+                if (i < currentBoard.Count - 1) {
+                    idListString += ", ";
+                }
+            }
+        }
+
+        if (mergeFound) {
+            idListString += " || MERGE POSSIBLE";
+        }
+
+        Debug.Log($"BOARD MANAGER || {idListString}");
 
         // Notify network if needed
         if (isPlayerCard)
