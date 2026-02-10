@@ -1,6 +1,7 @@
 using UnityEngine;
 using Unity.Netcode;
 using System.Collections.Generic;
+using System.Linq;
 
 public class BoardManager : MonoBehaviour
 {
@@ -19,6 +20,12 @@ public class BoardManager : MonoBehaviour
     [SerializeField] private float cardSpacing = 2.0f;
     [SerializeField] private float cardMoveSpeed = 12f;
     [SerializeField] private AnimationCurve layoutCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+
+    [Header("Merge Settings")]
+    [SerializeField] private float mergeAnimationDuration = 0.5f;
+    [SerializeField] private Color mergeFlashColor = new Color(1f, 0.8f, 0.2f, 1f);
+    [SerializeField] private float mergeScalePulse = 1.3f;
+    [SerializeField] private AnimationCurve mergeScaleCurve = AnimationCurve.EaseInOut(0, 1, 1, 0);
 
     [Header("Visual Feedback")]
     [SerializeField] private Color validDropColor = new Color(0.5f, 1f, 0.5f, 0.3f);
@@ -199,45 +206,10 @@ public class BoardManager : MonoBehaviour
 
         Debug.Log($"BOARD MANAGER || Placed card on {(isPlayerCard ? "player" : "opponent")} board ({targetBoard.Count}/{maxCardsPerBoard})");
 
-        List<GameObject> currentBoard = isPlayerCard ? playerBoardCards : opponentBoardCards;
-        string idListString = isPlayerCard ? "Player Card IDs: " : "Opponent Card IDs: ";
+        // CHECK FOR MERGES after placing the card
+        CheckAndMergeCards(isPlayerCard);
 
-        HashSet<int> seenIds = new HashSet<int>();
-        bool mergeFound = false;
-
-        for (int i = 0; i < currentBoard.Count; i++) 
-        {
-            // 1. Get the Visual component from the GameObject
-            CardVisual visual = currentBoard[i].GetComponent<CardVisual>();
-
-            if (visual != null) 
-            {
-                // 2. Get the Pool ID (the raw ID of the card)
-                int poolId = visual.CardID; 
-
-                // 3. Use your Library's math to get the Asset ID (100, 200, etc.)
-                int assetId = library.GetMappedAssetID(poolId);
-
-                if (seenIds.Contains(assetId)) {
-                    mergeFound = true;
-                }
-                seenIds.Add(assetId);
-
-                idListString += $"{assetId}";
-                
-                if (i < currentBoard.Count - 1) {
-                    idListString += ", ";
-                }
-            }
-        }
-
-        if (mergeFound) {
-            idListString += " || MERGE POSSIBLE";
-        }
-
-        Debug.Log($"BOARD MANAGER || {idListString}");
-
-        // Notify network if needed
+        // Network notification
         if (isPlayerCard)
         {
             NotifyServerCardPlaced(card);
@@ -246,14 +218,202 @@ public class BoardManager : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// Check for duplicate cards with MATCHING TIERS and merge them
+    /// Merges into the LEFT-MOST card (first in the list)
+    /// </summary>
+    private void CheckAndMergeCards(bool isPlayerBoard)
+    {
+        List<GameObject> currentBoard = isPlayerBoard ? playerBoardCards : opponentBoardCards;
+        
+        Debug.Log($"BOARD MANAGER || Checking for merges on {(isPlayerBoard ? "player" : "opponent")} board - {currentBoard.Count} cards");
+        
+        // Build a dictionary of (assetID, tier) -> list of cards
+        Dictionary<(int assetId, int tier), List<GameObject>> cardsByIdAndTier = new Dictionary<(int, int), List<GameObject>>();
+
+        for (int i = 0; i < currentBoard.Count; i++)
+        {
+            CardVisual visual = currentBoard[i].GetComponent<CardVisual>();
+            if (visual != null)
+            {
+                int poolId = visual.CardID;
+                int assetId = library.GetMappedAssetID(poolId);
+                
+                // Get the ACTUAL current tier from the card (not the base tier)
+                int tier = visual.GetCurrentTier();
+                
+                Debug.Log($"  Card {i}: Pool ID {poolId} → Asset ID {assetId}, Current Tier: {tier}");
+                
+                var key = (assetId, tier);
+                if (!cardsByIdAndTier.ContainsKey(key))
+                {
+                    cardsByIdAndTier[key] = new List<GameObject>();
+                }
+                
+                cardsByIdAndTier[key].Add(currentBoard[i]);
+            }
+        }
+
+        // Find duplicates and merge them (same asset ID AND same tier)
+        foreach (var kvp in cardsByIdAndTier)
+        {
+            (int assetId, int tier) = kvp.Key;
+            List<GameObject> cardsWithSameIdAndTier = kvp.Value;
+
+            // If we have 2 or more cards with the same asset ID AND tier, merge them
+            if (cardsWithSameIdAndTier.Count >= 2)
+            {
+                Debug.Log($"BOARD MANAGER || Found {cardsWithSameIdAndTier.Count} cards with asset ID {assetId} and tier {tier} - merging!");
+                
+                // Log each card's tier for verification
+                foreach (var card in cardsWithSameIdAndTier)
+                {
+                    CardVisual v = card.GetComponent<CardVisual>();
+                    if (v != null)
+                    {
+                        Debug.Log($"  - Card {card.name}: Asset ID {assetId}, Tier {v.GetCurrentTier()}");
+                    }
+                }
+                
+                // Merge into the LEFT-MOST card (first in the list)
+                GameObject targetCard = cardsWithSameIdAndTier[0]; // LEFTMOST (target)
+                GameObject cardToMerge = cardsWithSameIdAndTier[cardsWithSameIdAndTier.Count - 1]; // RIGHTMOST (will fly to left)
+
+                StartCoroutine(PerformMerge(cardToMerge, targetCard, isPlayerBoard));
+                
+                // Only merge one pair at a time to avoid complexity
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Perform the merge animation and upgrade
+    /// cardToMerge (right card) flies INTO targetCard (left card)
+    /// </summary>
+    private System.Collections.IEnumerator PerformMerge(GameObject cardToMerge, GameObject targetCard, bool isPlayerBoard)
+    {
+        Debug.Log($"BOARD MANAGER || Merging cards - {cardToMerge.name} flying into {targetCard.name}");
+
+        // Get the visual components
+        CardVisual mergeVisual = cardToMerge.GetComponent<CardVisual>();
+        CardVisual targetVisual = targetCard.GetComponent<CardVisual>();
+
+        if (targetVisual == null || mergeVisual == null)
+        {
+            Debug.LogError("BOARD MANAGER || Cannot merge - missing CardVisual component");
+            yield break;
+        }
+
+        // Get current tier data from the actual card (not the base tier)
+        CardData currentData = targetVisual.CurrentCardData;
+        
+        if (currentData == null)
+        {
+            Debug.LogError($"BOARD MANAGER || Cannot find current card data");
+            yield break;
+        }
+
+        // ANIMATE THE MERGE
+        Vector3 mergeStartPos = cardToMerge.transform.position;
+        Vector3 targetPos = targetCard.transform.position;
+        Vector3 mergeStartScale = cardToMerge.transform.localScale;
+        Vector3 targetStartScale = targetCard.transform.localScale;
+
+        SpriteRenderer mergeSR = cardToMerge.GetComponent<SpriteRenderer>();
+        SpriteRenderer targetSR = targetCard.GetComponent<SpriteRenderer>();
+        
+        Color mergeOriginalColor = mergeSR != null ? mergeSR.color : Color.white;
+        Color targetOriginalColor = targetSR != null ? targetSR.color : Color.white;
+
+        float elapsed = 0f;
+
+        // Animate the RIGHT card flying INTO the LEFT card
+        while (elapsed < mergeAnimationDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / mergeAnimationDuration;
+            float curveT = mergeScaleCurve.Evaluate(t);
+
+            // Move the merging card to the target (NO SHRINKING - stays full size)
+            cardToMerge.transform.position = Vector3.Lerp(mergeStartPos, targetPos, t);
+            cardToMerge.transform.localScale = mergeStartScale; // Keep original scale
+            
+            // Pulse the target card
+            targetCard.transform.localScale = Vector3.Lerp(targetStartScale, targetStartScale * mergeScalePulse, curveT);
+            
+            // Flash colors on BOTH cards
+            if (mergeSR != null)
+            {
+                mergeSR.color = Color.Lerp(mergeOriginalColor, mergeFlashColor, t);
+            }
+            if (targetSR != null)
+            {
+                targetSR.color = Color.Lerp(targetOriginalColor, mergeFlashColor, curveT);
+            }
+
+            yield return null;
+        }
+
+        // Remove the merged card from board
+        List<GameObject> currentBoard = isPlayerBoard ? playerBoardCards : opponentBoardCards;
+        currentBoard.Remove(cardToMerge);
+        cardBoardIndices.Remove(cardToMerge);
+        cardTargetPositions.Remove(cardToMerge);
+        Destroy(cardToMerge);
+
+        // UPGRADE THE TARGET CARD TO NEXT TIER
+        if (currentData.nextTier != null)
+        {
+            Debug.Log($"BOARD MANAGER || Upgrading card from tier {currentData.tier} to tier {currentData.nextTier.tier}");
+            
+            // Update the visual with new tier data
+            targetVisual.Initialize(targetVisual.CardID, currentData.nextTier);
+            
+            // Visual feedback for upgrade
+            if (targetSR != null)
+            {
+                targetSR.color = mergeFlashColor;
+            }
+            
+            yield return new WaitForSeconds(0.2f);
+            
+            if (targetSR != null)
+            {
+                targetSR.color = currentData.nextTier.themeColor;
+            }
+        }
+        else
+        {
+            Debug.Log($"BOARD MANAGER || Card is already max tier {currentData.tier}");
+            
+            // Restore original color if already max tier
+            if (targetSR != null)
+            {
+                targetSR.color = targetOriginalColor;
+            }
+        }
+
+        // Reset target card scale
+        targetCard.transform.localScale = targetStartScale;
+
+        // Rearrange remaining cards
+        ArrangeCardsOnBoard(isPlayerBoard);
+
+        Debug.Log($"BOARD MANAGER || Merge complete! Remaining cards: {currentBoard.Count}");
+    }
+
     private void ArrangeCardsOnBoard(bool isPlayerBoard)
     {
         List<GameObject> cards = isPlayerBoard ? playerBoardCards : opponentBoardCards;
         Transform zone = isPlayerBoard ? playerBoardZone : opponentBoardZone;
 
-        if (cards.Count == 0) return;
+        if (zone == null || cards.Count == 0)
+        {
+            return;
+        }
 
-        // Calculate total width and starting position
+        // Calculate positions
         float totalWidth = (cards.Count - 1) * cardSpacing;
         float startX = -totalWidth / 2f;
 
@@ -262,17 +422,11 @@ public class BoardManager : MonoBehaviour
             GameObject card = cards[i];
             if (card == null) continue;
 
-            // Calculate target position
-            float xPos = startX + (i * cardSpacing);
-            Vector3 targetPos = zone.position + new Vector3(xPos, 0, 0);
-
-            // Store target position for smooth movement
+            // Set target position
+            float verticalOffset = isPlayerBoard ? -1.2f : 0;
+            Vector3 targetPos = new Vector3(startX + (i * cardSpacing), verticalOffset, 0);
             cardTargetPositions[card] = targetPos;
             cardBoardIndices[card] = i;
-
-            // Reset rotation and scale
-            card.transform.rotation = Quaternion.identity;
-            card.transform.localScale = Vector3.one;
 
             // Set sorting order
             SpriteRenderer sr = card.GetComponent<SpriteRenderer>();
@@ -285,19 +439,28 @@ public class BoardManager : MonoBehaviour
 
     private void UpdateCardPositions()
     {
+        // Smoothly lerp cards to their target positions
         foreach (var kvp in cardTargetPositions)
         {
             GameObject card = kvp.Key;
             Vector3 targetPos = kvp.Value;
 
-            if (card == null) continue;
+            if (card != null)
+            {
+                // Check if card is being dragged
+                CardDraggable draggable = card.GetComponent<CardDraggable>();
+                if (draggable != null && draggable.IsDragging)
+                {
+                    continue; // Don't update position while dragging
+                }
 
-            // Smooth movement to target position
-            card.transform.position = Vector3.Lerp(
-                card.transform.position,
-                targetPos,
-                Time.deltaTime * cardMoveSpeed
-            );
+                // Smooth movement
+                card.transform.localPosition = Vector3.Lerp(
+                    card.transform.localPosition,
+                    targetPos,
+                    Time.deltaTime * cardMoveSpeed
+                );
+            }
         }
     }
 
@@ -310,10 +473,9 @@ public class BoardManager : MonoBehaviour
         if (cards.Contains(card))
         {
             cards.Remove(card);
-            cardTargetPositions.Remove(card);
             cardBoardIndices.Remove(card);
+            cardTargetPositions.Remove(card);
 
-            // Rearrange remaining cards
             ArrangeCardsOnBoard(isPlayerBoard);
 
             Debug.Log($"BOARD MANAGER || Removed card from {(isPlayerBoard ? "player" : "opponent")} board");
@@ -375,6 +537,8 @@ public class BoardManager : MonoBehaviour
         }
 
         cards.Clear();
+        cardTargetPositions.Clear();
+        cardBoardIndices.Clear();
         Debug.Log($"BOARD MANAGER || Cleared {(isPlayerBoard ? "player" : "opponent")} board");
     }
 

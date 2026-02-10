@@ -60,6 +60,7 @@
     <Compile Include="Assets\_Scripts\UI\CardDebugger.cs" />
     <Compile Include="Assets\_Scripts\Data\CardManager.cs" />
     <Compile Include="Assets\_Scripts\UI\GameManagerUI.cs" />
+    <Compile Include="Assets\_Scripts\UI\CardMergeEffects.cs" />
     <Compile Include="Assets\_Scripts\Networking\GameManager.cs" />
     <Compile Include="Assets\_Scripts\Networking\DeckManager.cs" />
     <Compile Include="Assets\_Scripts\Data\CardLibrary.cs" />
