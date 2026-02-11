@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.Netcode;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -20,6 +21,10 @@ public class BoardManager : MonoBehaviour
     [SerializeField] private float cardSpacing = 2.0f;
     [SerializeField] private float cardMoveSpeed = 12f;
     [SerializeField] private AnimationCurve layoutCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+
+    [Header("Reveal Phase")]
+    [SerializeField] private float revealFlipDuration = 0.25f;
+    [SerializeField] private float delayBetweenReveals = 0.35f;
 
     [Header("Merge Settings")]
     [SerializeField] private float mergeAnimationDuration = 0.5f;
@@ -313,14 +318,11 @@ public class BoardManager : MonoBehaviour
             draggable.SetOnBoard(true);
         }
         
-        // Ensure shadow component exists and is set up for opponent cards
-        if (!isPlayerCard)
+        // Ensure shadow component exists for all cards on board (player and opponent)
+        CardShadow shadow = card.GetComponent<CardShadow>();
+        if (shadow == null)
         {
-            CardShadow shadow = card.GetComponent<CardShadow>();
-            if (shadow == null)
-            {
-                shadow = card.AddComponent<CardShadow>();
-            }
+            shadow = card.AddComponent<CardShadow>();
         }
 
         // Arrange all cards
@@ -328,8 +330,11 @@ public class BoardManager : MonoBehaviour
 
         Debug.Log($"BOARD MANAGER || Placed card on {(isPlayerCard ? "player" : "opponent")} board ({targetBoard.Count}/{maxCardsPerBoard})");
 
-        // CHECK FOR MERGES after placing the card
-        CheckAndMergeCards(isPlayerCard);
+        // CHECK FOR MERGES after placing the card (player only; opponent merges only in reveal phase)
+        if (isPlayerCard)
+        {
+            CheckAndMergeCards(isPlayerCard);
+        }
 
         // Network notification
         if (isPlayerCard)
@@ -502,6 +507,34 @@ public class BoardManager : MonoBehaviour
 
         // Check again — the upgraded card may now match another card on the board
         CheckAndMergeCards(isPlayerBoard);
+    }
+
+    /// <summary>
+    /// Called at start of reveal phase: flip opponent cards one by one, then run merge if possible.
+    /// </summary>
+    public void StartRevealSequence()
+    {
+        StartCoroutine(RevealOpponentCardsThenMerge());
+    }
+
+    private IEnumerator RevealOpponentCardsThenMerge()
+    {
+        // Reveal opponent cards one by one
+        List<GameObject> cardsToReveal = new List<GameObject>(opponentBoardCards);
+        foreach (GameObject card in cardsToReveal)
+        {
+            if (card == null) continue;
+            CardVisual visual = card.GetComponent<CardVisual>();
+            if (visual != null && visual.IsFaceDown)
+            {
+                yield return StartCoroutine(visual.FlipToReveal(revealFlipDuration));
+                yield return new WaitForSeconds(delayBetweenReveals);
+            }
+        }
+
+        // After all revealed, check for merges and play merge animation
+        yield return new WaitForSeconds(0.15f);
+        CheckAndMergeCards(false);
     }
 
     private void ArrangeCardsOnBoard(bool isPlayerBoard)
@@ -740,11 +773,11 @@ public class BoardManager : MonoBehaviour
         // Remove one card from opponent hand
         CardManager.Instance.RemoveOneOpponentHandCard();
 
-        // Create the card
+        // Create the card face-down (revealed in reveal phase)
         GameObject card = Instantiate(CardManager.Instance.GetCardPrefab());
         if (card != null)
         {
-            CardManager.Instance.InitializeCardVisual(card, cardId, true);
+            CardManager.Instance.InitializeCardVisual(card, cardId, false);
             
             CardDraggable draggable = card.GetComponent<CardDraggable>();
             if (draggable != null)

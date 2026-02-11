@@ -54,28 +54,7 @@ public class CardShadow : MonoBehaviour
         // Add sprite renderer
         shadowRenderer = shadowObject.AddComponent<SpriteRenderer>();
         
-        // Copy card sprite - get the FACE renderer if it exists
-        CardVisual cardVisual = GetComponent<CardVisual>();
-        SpriteRenderer faceRenderer = null;
-        
-        // Try to find face renderer (assuming it's a child named "Face" or similar)
-        foreach (Transform child in transform)
-        {
-            SpriteRenderer sr = child.GetComponent<SpriteRenderer>();
-            if (sr != null && child.name.Contains("Face"))
-            {
-                faceRenderer = sr;
-                break;
-            }
-        }
-        
-        // Use face renderer if found, otherwise use card renderer
-        SpriteRenderer sourceRenderer = faceRenderer != null ? faceRenderer : cardRenderer;
-        
-        if (sourceRenderer != null)
-        {
-            shadowRenderer.sprite = sourceRenderer.sprite;
-        }
+        UpdateShadowSprite();
         
         // Style the shadow
         shadowRenderer.color = shadowColor;
@@ -148,18 +127,26 @@ public class CardShadow : MonoBehaviour
     }
 
     /// <summary>
-    /// Update shadow to match card's current sprite
-    /// Call this if you change the card art at runtime
+    /// Update shadow to match card's current sprite (face or card back when face-down).
+    /// Call this if you change the card art at runtime or when flipping.
     /// </summary>
     public void UpdateShadowSprite()
     {
         if (shadowRenderer == null) return;
         
-        // Try to get face renderer first
+        CardVisual cardVisual = GetComponent<CardVisual>();
+        // When face-down, card renderer shows the back; use it so shadow matches
+        if (cardVisual != null && cardVisual.IsFaceDown && cardRenderer != null)
+        {
+            shadowRenderer.sprite = cardRenderer.sprite;
+            return;
+        }
+        
+        // Try to get face renderer first (visible front)
         foreach (Transform child in transform)
         {
             SpriteRenderer sr = child.GetComponent<SpriteRenderer>();
-            if (sr != null && child.name.Contains("Face"))
+            if (sr != null && child.name.Contains("Face") && sr.enabled)
             {
                 shadowRenderer.sprite = sr.sprite;
                 return;

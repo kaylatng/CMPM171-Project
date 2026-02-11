@@ -325,22 +325,23 @@ public class CardManager : MonoBehaviour
         }
         else
         {
-            // Opponent card - show card back
-            if (spriteRenderer != null)
+            // Opponent card - initialize with real data but show card back until reveal phase
+            if (cardVisual != null && cardId >= 0)
             {
-                if (cardLibrary != null && cardLibrary.cardBack != null)
-                {
-                    spriteRenderer.sprite = cardLibrary.cardBack;
-                }
-                else
-                {
-                    spriteRenderer.color = Color.white;
-                }
+                CardData data = cardLibrary.GetTierOneAssetFromPool(cardId);
+                cardVisual.Initialize(cardId, data);
+                cardVisual.SetFaceDown(true, cardLibrary != null ? cardLibrary.cardBack : null);
             }
-
-            if (cardVisual != null)
+            else if (cardVisual != null)
             {
                 cardVisual.CardID = -1;
+            }
+            else if (spriteRenderer != null)
+            {
+                if (cardLibrary != null && cardLibrary.cardBack != null)
+                    spriteRenderer.sprite = cardLibrary.cardBack;
+                else
+                    spriteRenderer.color = Color.white;
             }
 
             CardDraggable draggable = cardObject.GetComponent<CardDraggable>();

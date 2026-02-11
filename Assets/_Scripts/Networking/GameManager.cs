@@ -194,11 +194,9 @@ public class GameManager : NetworkBehaviour
 	private void RevealBoardsClientRpc()
 	{
 		Debug.Log("GAME MANAGER || Revealing boards...");
-		// TODO: Trigger visual effects, reveal opponent cards, etc.
-		
-		// Could add board reveal logic here
-		if (BoardManager.Instance != null) {
-			// BoardManager.Instance.RevealAllCards();
+		if (BoardManager.Instance != null)
+		{
+			BoardManager.Instance.StartRevealSequence();
 		}
 	}
 
