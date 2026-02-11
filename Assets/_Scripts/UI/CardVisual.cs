@@ -88,6 +88,13 @@ public class CardVisual : MonoBehaviour
         {
             if (faceRenderer != null) faceRenderer.enabled = false;
             if (frameRenderer != null) frameRenderer.enabled = false;
+            // Hide prefab "Square" child so its white sprite doesn't render over the card back
+            var squareChild = transform.Find("Square");
+            if (squareChild != null)
+            {
+                var squareSr = squareChild.GetComponent<SpriteRenderer>();
+                if (squareSr != null) squareSr.enabled = false;
+            }
             if (cardRenderer != null)
             {
                 if (cardBackSprite != null)
@@ -103,6 +110,13 @@ public class CardVisual : MonoBehaviour
         {
             if (faceRenderer != null) faceRenderer.enabled = true;
             if (frameRenderer != null) frameRenderer.enabled = true;
+            // Re-enable prefab "Square" child when face-up (e.g. after reveal)
+            var squareChild = transform.Find("Square");
+            if (squareChild != null)
+            {
+                var squareSr = squareChild.GetComponent<SpriteRenderer>();
+                if (squareSr != null) squareSr.enabled = true;
+            }
             if (cardRenderer != null)
             {
                 cardRenderer.sortingOrder = 0; // background layer when face-up

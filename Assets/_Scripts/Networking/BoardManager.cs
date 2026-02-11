@@ -562,11 +562,15 @@ public class BoardManager : MonoBehaviour
             cardTargetPositions[card] = targetPos;
             cardBoardIndices[card] = i;
 
-            // Set sorting order
+            // Set sorting order (face-down cards keep card back above prefab "Square" by using 2 + index)
             SpriteRenderer sr = card.GetComponent<SpriteRenderer>();
             if (sr != null)
             {
-                sr.sortingOrder = i;
+                var cv = card.GetComponent<CardVisual>();
+                if (cv != null && cv.IsFaceDown)
+                    sr.sortingOrder = 2 + i;
+                else
+                    sr.sortingOrder = i;
             }
         }
     }
@@ -769,7 +773,6 @@ public class BoardManager : MonoBehaviour
             Debug.LogError("BOARD MANAGER || CardManager.Instance is null!");
             return;
         }
-
         // Remove one card from opponent hand
         CardManager.Instance.RemoveOneOpponentHandCard();
 
