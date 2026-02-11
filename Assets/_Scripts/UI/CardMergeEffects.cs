@@ -1,10 +1,8 @@
 using UnityEngine;
 using System.Collections;
 
-/// <summary>
 /// Optional visual effects for card merging
 /// Add this component to enhance the merge experience with particles and effects
-/// </summary>
 public class CardMergeEffects : MonoBehaviour
 {
     [Header("Particle Settings")]
@@ -28,9 +26,7 @@ public class CardMergeEffects : MonoBehaviour
     [SerializeField] private float shakeIntensity = 0.1f;
     [SerializeField] private float shakeDuration = 0.2f;
 
-    /// <summary>
     /// Play merge effect at the target card position
-    /// </summary>
     public void PlayMergeEffect(Vector3 position, CardData upgradedData = null)
     {
         StartCoroutine(MergeEffectSequence(position, upgradedData));
@@ -66,18 +62,14 @@ public class CardMergeEffects : MonoBehaviour
         }
     }
 
-    /// <summary>
     /// Spawn particles from a prefab
-    /// </summary>
     private void SpawnMergeParticles(Vector3 position)
     {
         GameObject particleObj = Instantiate(mergeParticlePrefab, position, Quaternion.identity);
         Destroy(particleObj, particleLifetime);
     }
 
-    /// <summary>
     /// Create simple sprite-based particles
-    /// </summary>
     private void CreateSimpleParticles(Vector3 position, CardData upgradedData)
     {
         for (int i = 0; i < particleCount; i++)
@@ -179,9 +171,7 @@ public class CardMergeEffects : MonoBehaviour
         cam.transform.localPosition = originalPos;
     }
 
-    /// <summary>
     /// Play a visual trail from source to target (for the merging card)
-    /// </summary>
     public void PlayMergeTrail(Vector3 startPos, Vector3 endPos, float duration)
     {
         StartCoroutine(CreateTrail(startPos, endPos, duration));

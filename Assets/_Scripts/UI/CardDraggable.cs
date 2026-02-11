@@ -35,12 +35,14 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     
     private SpriteRenderer cardBackgroundRenderer;
     private CardVisual cardVisual;
+    private BoardSlot currentSlot;
     
     public static CardDraggable SelectedCard { get; private set; }
 
     public bool IsDragging => isDragging;
     public bool IsSelected => isSelected;
     public bool IsOnBoard => isOnBoard;
+    public BoardSlot CurrentSlot => currentSlot;
 
     private void Awake()
     {
@@ -444,6 +446,11 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     public void SetOnBoard(bool onBoard)
     {
         isOnBoard = onBoard;
+    }
+    
+    public void SetCurrentSlot(BoardSlot slot)
+    {
+        currentSlot = slot;
     }
     
     private System.Collections.IEnumerator RearrangeHandAfterFrame(Transform handZone)

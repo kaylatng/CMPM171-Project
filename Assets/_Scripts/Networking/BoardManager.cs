@@ -42,6 +42,10 @@ public class BoardManager : MonoBehaviour
     private SpriteRenderer playerZoneRenderer;
     private SpriteRenderer opponentZoneRenderer;
 
+    // Track board slots for blinking feedback
+    private List<BoardSlot> playerSlots = new List<BoardSlot>();
+    private List<BoardSlot> opponentSlots = new List<BoardSlot>();
+
     private void Awake()
     {
         if (Instance == null)
@@ -64,6 +68,103 @@ public class BoardManager : MonoBehaviour
     {
         // Smoothly move cards to their target positions
         UpdateCardPositions();
+        
+        // Update slot blinking based on card selection/dragging
+        UpdateSlotBlinking();
+    }
+    
+    private void UpdateSlotBlinking()
+    {
+        // Check if a card is selected or being dragged from hand
+        bool shouldBlink = false;
+        
+        // Check if a card is selected
+        if (CardDraggable.SelectedCard != null)
+        {
+            CardDraggable selected = CardDraggable.SelectedCard;
+            
+            // Check if card is in hand (not on board)
+            // When dragging, card is unparented, so check IsOnBoard property
+            if (!selected.IsOnBoard)
+            {
+                // Also verify it's not currently on board
+                if (!IsCardOnBoard(selected.gameObject, true))
+                {
+                    shouldBlink = true;
+                }
+            }
+        }
+        
+        // Also check if any card is being dragged (even if not selected)
+        if (!shouldBlink)
+        {
+            // Check all cards in player hand
+            Transform handZone = GameObject.Find("PlayerHandZone")?.transform;
+            if (handZone != null)
+            {
+                for (int i = 0; i < handZone.childCount; i++)
+                {
+                    Transform child = handZone.GetChild(i);
+                    CardDraggable draggable = child.GetComponent<CardDraggable>();
+                    if (draggable != null && draggable.IsDragging)
+                    {
+                        shouldBlink = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Also check unparented cards that might be dragged (they're unparented during drag)
+            // We'll check if any CardDraggable is currently dragging and not on board
+            if (!shouldBlink)
+            {
+                CardDraggable[] allDraggables = FindObjectsOfType<CardDraggable>();
+                foreach (CardDraggable draggable in allDraggables)
+                {
+                    if (draggable != null && draggable.IsDragging && !draggable.IsOnBoard)
+                    {
+                        // Check if it's a player card (not opponent)
+                        Transform parent = draggable.transform.parent;
+                        if (parent == null || parent.name == "PlayerHandZone")
+                        {
+                            shouldBlink = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update blinking state for all player slots
+        foreach (BoardSlot slot in playerSlots)
+        {
+            if (slot != null)
+            {
+                slot.SetBlinking(shouldBlink);
+            }
+        }
+    }
+    
+    public void RegisterSlot(BoardSlot slot)
+    {
+        if (slot == null) return;
+        
+        if (slot.IsPlayerSlot)
+        {
+            if (!playerSlots.Contains(slot))
+            {
+                playerSlots.Add(slot);
+                Debug.Log($"BOARD MANAGER || Registered player slot {slot.SlotIndex}");
+            }
+        }
+        else
+        {
+            if (!opponentSlots.Contains(slot))
+            {
+                opponentSlots.Add(slot);
+                Debug.Log($"BOARD MANAGER || Registered opponent slot {slot.SlotIndex}");
+            }
+        }
     }
 
     private void SetupBoardZones()
@@ -110,6 +211,8 @@ public class BoardManager : MonoBehaviour
                 playerZoneRenderer.sortingOrder = -10;
             }
             playerZoneRenderer.color = normalZoneColor;
+            // Hide the sprite renderer (keep collider for drop detection)
+            playerZoneRenderer.enabled = false;
 
             // Add collider for drop detection
             BoxCollider2D collider = playerBoardZone.GetComponent<BoxCollider2D>();
@@ -131,6 +234,8 @@ public class BoardManager : MonoBehaviour
 
             }
             opponentZoneRenderer.color = normalZoneColor;
+            // Hide the sprite renderer (keep collider for drop detection)
+            opponentZoneRenderer.enabled = false;
 
             BoxCollider2D collider = opponentBoardZone.GetComponent<BoxCollider2D>();
             if (collider == null)
@@ -201,6 +306,23 @@ public class BoardManager : MonoBehaviour
 
         cardBoardIndices[card] = targetBoard.IndexOf(card);
 
+        // Set card as on board for shadow visibility
+        CardDraggable draggable = card.GetComponent<CardDraggable>();
+        if (draggable != null)
+        {
+            draggable.SetOnBoard(true);
+        }
+        
+        // Ensure shadow component exists and is set up for opponent cards
+        if (!isPlayerCard)
+        {
+            CardShadow shadow = card.GetComponent<CardShadow>();
+            if (shadow == null)
+            {
+                shadow = card.AddComponent<CardShadow>();
+            }
+        }
+
         // Arrange all cards
         ArrangeCardsOnBoard(isPlayerCard);
 
@@ -218,74 +340,50 @@ public class BoardManager : MonoBehaviour
         return true;
     }
 
-    /// <summary>
-    /// Check for duplicate cards with MATCHING TIERS and merge them
-    /// Merges into the LEFT-MOST card (first in the list)
-    /// </summary>
+    /// Check for duplicate cards with MATCHING TIERS and merge them.
+    /// Keys on the CardData reference directly — since IDs are 100/101/102 per tier,
+    /// same CardData object = same card type AND same tier. No ID math needed.
+    /// Merges into the LEFT-MOST card (first in the list).
     private void CheckAndMergeCards(bool isPlayerBoard)
     {
         List<GameObject> currentBoard = isPlayerBoard ? playerBoardCards : opponentBoardCards;
-        
-        Debug.Log($"BOARD MANAGER || Checking for merges on {(isPlayerBoard ? "player" : "opponent")} board - {currentBoard.Count} cards");
-        
-        // Build a dictionary of (assetID, tier) -> list of cards
-        Dictionary<(int assetId, int tier), List<GameObject>> cardsByIdAndTier = new Dictionary<(int, int), List<GameObject>>();
+
+        // Group cards by their exact CardData reference.
+        // Same CardData = same card type AND same tier (100 = T1, 101 = T2, 102 = T3).
+        Dictionary<CardData, List<GameObject>> cardsByData = new Dictionary<CardData, List<GameObject>>();
 
         for (int i = 0; i < currentBoard.Count; i++)
         {
             CardVisual visual = currentBoard[i].GetComponent<CardVisual>();
-            if (visual != null)
-            {
-                int poolId = visual.CardID;
-                int assetId = library.GetMappedAssetID(poolId);
-                
-                // Get the ACTUAL current tier from the card (not the base tier)
-                int tier = visual.GetCurrentTier();
-                
-                Debug.Log($"  Card {i}: Pool ID {poolId} → Asset ID {assetId}, Current Tier: {tier}");
-                
-                var key = (assetId, tier);
-                if (!cardsByIdAndTier.ContainsKey(key))
-                {
-                    cardsByIdAndTier[key] = new List<GameObject>();
-                }
-                
-                cardsByIdAndTier[key].Add(currentBoard[i]);
-            }
+            if (visual == null || visual.CurrentCardData == null) continue;
+
+            CardData data = visual.CurrentCardData;
+
+            Debug.Log($"BOARD MANAGER || Card {i}: {data.cardName} (ID: {data.cardID}, Tier: {data.tier})");
+
+            if (!cardsByData.ContainsKey(data))
+                cardsByData[data] = new List<GameObject>();
+
+            cardsByData[data].Add(currentBoard[i]);
         }
 
-        // Find duplicates and merge them (same asset ID AND same tier)
-        foreach (var kvp in cardsByIdAndTier)
+        // Find any pair sharing the same CardData
+        foreach (var kvp in cardsByData)
         {
-            (int assetId, int tier) = kvp.Key;
-            List<GameObject> cardsWithSameIdAndTier = kvp.Value;
-
-            // If we have 2 or more cards with the same asset ID AND tier, merge them
-            if (cardsWithSameIdAndTier.Count >= 2)
+            if (kvp.Value.Count >= 2)
             {
-                Debug.Log($"BOARD MANAGER || Found {cardsWithSameIdAndTier.Count} cards with asset ID {assetId} and tier {tier} - merging!");
-                
-                // Log each card's tier for verification
-                foreach (var card in cardsWithSameIdAndTier)
-                {
-                    CardVisual v = card.GetComponent<CardVisual>();
-                    if (v != null)
-                    {
-                        Debug.Log($"  - Card {card.name}: Asset ID {assetId}, Tier {v.GetCurrentTier()}");
-                    }
-                }
-                
-                // Merge into the LEFT-MOST card (first in the list)
-                GameObject targetCard = cardsWithSameIdAndTier[0]; // LEFTMOST (target)
-                GameObject cardToMerge = cardsWithSameIdAndTier[cardsWithSameIdAndTier.Count - 1]; // RIGHTMOST (will fly to left)
+                CardData matchedData = kvp.Key;
+                Debug.Log($"BOARD MANAGER || Match: {matchedData.cardName} Tier {matchedData.tier} x{kvp.Value.Count} - merging!");
+
+                GameObject targetCard = kvp.Value[0];                     // LEFTMOST (upgraded)
+                GameObject cardToMerge = kvp.Value[kvp.Value.Count - 1];  // RIGHTMOST (flies in)
 
                 StartCoroutine(PerformMerge(cardToMerge, targetCard, isPlayerBoard));
-                
-                // Only merge one pair at a time to avoid complexity
-                break;
+                break; // One merge at a time
             }
         }
     }
+
 
     /// <summary>
     /// Perform the merge animation and upgrade
@@ -401,6 +499,9 @@ public class BoardManager : MonoBehaviour
         ArrangeCardsOnBoard(isPlayerBoard);
 
         Debug.Log($"BOARD MANAGER || Merge complete! Remaining cards: {currentBoard.Count}");
+
+        // Check again — the upgraded card may now match another card on the board
+        CheckAndMergeCards(isPlayerBoard);
     }
 
     private void ArrangeCardsOnBoard(bool isPlayerBoard)
@@ -570,6 +671,38 @@ public class BoardManager : MonoBehaviour
         renderer.color = original;
     }
 
+    // Slot-based card placement notification
+    // The bool parameter can be either isFromHand or shouldNotifyServer - both indicate server notification should happen
+    public void OnCardPlacedInSlot(BoardSlot slot, GameObject card, bool shouldNotifyServer = true)
+    {
+        if (slot == null || card == null) return;
+        
+        // If card is being placed in a player slot and should notify server
+        if (slot.IsPlayerSlot && shouldNotifyServer)
+        {
+            NotifyServerCardPlaced(card);
+        }
+        
+        Debug.Log($"BOARD MANAGER || Card placed in slot {slot.SlotIndex} (notify server: {shouldNotifyServer})");
+    }
+    
+    public void OnCardRemovedFromSlot(BoardSlot slot, GameObject card)
+    {
+        if (slot == null || card == null) return;
+        
+        // Remove card from board tracking if it exists
+        if (playerBoardCards.Contains(card))
+        {
+            RemoveCardFromBoard(card, true, notifyServer: false);
+        }
+        else if (opponentBoardCards.Contains(card))
+        {
+            RemoveCardFromBoard(card, false, notifyServer: false);
+        }
+        
+        Debug.Log($"BOARD MANAGER || Card removed from slot {slot.SlotIndex}");
+    }
+
     // Network integration points
     private void NotifyServerCardPlaced(GameObject card)
     {
@@ -617,6 +750,15 @@ public class BoardManager : MonoBehaviour
             if (draggable != null)
             {
                 draggable.enabled = false;
+                // Set as on board so shadow will show
+                draggable.SetOnBoard(true);
+            }
+            
+            // Ensure shadow component exists for opponent cards
+            CardShadow shadow = card.GetComponent<CardShadow>();
+            if (shadow == null)
+            {
+                shadow = card.AddComponent<CardShadow>();
             }
             
             TryPlaceCard(card, false, index);

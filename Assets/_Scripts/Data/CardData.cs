@@ -23,6 +23,7 @@ public class CardData : ScriptableObject
 	[Header("Visuals")]
 	public Sprite cardArt;       // art goes here
 	public Color themeColor;     // placeholder
+	public Sprite tierFrame;	 // tier frame
 
 	[TextArea]
 	public string description;   // "create 1 tier copy" or "the cupid guides you" etc...
