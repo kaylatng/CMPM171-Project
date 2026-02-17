@@ -4,49 +4,33 @@ using System.Collections.Generic;
 [CreateAssetMenu(fileName = "NewCardLibrary", menuName = "Cards/Library")]
 public class CardLibrary : ScriptableObject
 {
-    public List<CardData> allCards = new List<CardData>();
-    public Sprite cardBack;
+	public List<CardData> allCards = new List<CardData>();
+	public Sprite cardBack;
 
-    private Dictionary<int, CardData> cardLookup;
-
-    private void OnEnable()
-    {
-        BuildLookup();
-    }
-
-    private void BuildLookup()
-    {
-        cardLookup = new Dictionary<int, CardData>();
-
-        foreach (CardData card in allCards)
+	// returns scriptable object asset
+	public CardData GetCardAssetByID(int assetID){
+		for (int i = 0; i < allCards.Count; i++)
         {
-            if (card == null) continue;
-
-            if (cardLookup.ContainsKey(card.cardID))
+            if (allCards[i] != null && allCards[i].cardID == assetID)
             {
-                Debug.LogWarning($"CARD LIBRARY || Duplicate cardID found: {card.cardID} ({card.cardName}). Overwriting.");
+                return allCards[i];
             }
-
-            cardLookup[card.cardID] = card;
-            Debug.Log($"CARD LIBRARY || Built lookup with {cardLookup.Count} cards. Keys: {string.Join(",", cardLookup.Keys)}");
-
         }
-    }
-
-    public CardData GetCardByID(int id)
-    {
-        if (cardLookup == null || cardLookup.Count == 0)
-        {
-            BuildLookup();
-        }
-
-        if (cardLookup.TryGetValue(id, out CardData card))
-        {
-            return card;
-        }
-
-        Debug.LogWarning($"CARD LIBRARY || No CardData found for ID: {id}");
         return null;
+	}
+
+	// get tier 1 asset from a pool ID
+	public int GetMappedAssetID(int poolID) 
+    {
+		// explanation: 0-9 -> 100, 10-19 -> 200 ... 60-65 -> 700
+        return (poolID / 10 + 1) * 100;
+    }
+	
+	// get tier 1 asset directly from a poolID
+	public CardData GetTierOneAssetFromPool(int poolID) 
+    {
+        int assetID = GetMappedAssetID(poolID);
+		return GetCardAssetByID(assetID);
     }
 }
 

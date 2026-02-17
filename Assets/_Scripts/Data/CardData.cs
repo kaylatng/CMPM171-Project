@@ -3,20 +3,28 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "NewCard", menuName = "Cards/Card")]
 public class CardData : ScriptableObject
 {
-  [Header("Identification")]
-  public string cardName;      // "Starcrossed"
-  public int cardID;           // 0-65
-  public int tier = 1;         // 1, 2, or 3
-  public bool isModifier;      // true for Duplicator
+	[Header("Identification")]
+	public string cardName;      // "Starcrossed"
+	public int cardID;           // e.g., 101, 102, 103
+	public int tier = 1;         // 1, 2, or 3
+	public bool isModifier;      // true for Duplicator
 
-  [Header("Stats")]
-  public int manaCost;         // set to 0 for Duplicator
-  public int attackDamage;
+	[Header("Next Tier")]
+	public CardData nextTier;
 
-  [Header("Visuals")]
-  public Sprite cardArt;       // art goes here
-  public Color themeColor;     // Pink/Red placeholder
+	[Header("Stats")]
+	public int manaCost;         // set to 0 for Duplicator
+	public int attackDamage;
 
-  [TextArea]
-  public string description;   // "create 1 tier copy" or "the cupid guides you" etc...
+	[Header("Usage")]
+	public int maxCharges;       // charge before the card expires
+	public bool destroyOnEmpty = true;
+
+	[Header("Visuals")]
+	public Sprite cardArt;       // art goes here
+	public Color themeColor;     // placeholder
+	public Sprite tierFrame;	 // tier frame
+
+	[TextArea]
+	public string description;   // "create 1 tier copy" or "the cupid guides you" etc...
 }

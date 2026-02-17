@@ -16,8 +16,12 @@ MonoBehaviour:
   cardID: 102
   tier: 3
   isModifier: 0
+  nextTier: {fileID: 0}
   manaCost: 0
   attackDamage: 0
-  cardArt: {fileID: 0}
+  maxCharges: 0
+  destroyOnEmpty: 1
+  cardArt: {fileID: 6352706402464596295, guid: a69b2b81c46d8bf478814ba8805c7e68, type: 3}
   themeColor: {r: 0, g: 0, b: 0, a: 0}
+  tierFrame: {fileID: 5607210529911153424, guid: 2df50e4c17a5b2444bfc4dcc750893f1, type: 3}
   description: 

@@ -150,7 +150,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7570f0fb1a79a7e40ac6096fab185a13, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DeckClickable
-  hoverColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  hoverColor: {r: 0.5644823, g: 0.261552, b: 0.89433956, a: 1}
 --- !u!1 &2395054173446713975
 GameObject:
   m_ObjectHideFlags: 0
