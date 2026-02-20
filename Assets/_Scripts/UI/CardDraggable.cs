@@ -63,6 +63,13 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (isDragging) return;
         if (!IsPlayerCard()) return;
 
+        // If card is on board and can attack, tap = schedule attack (costs 1 AP)
+        if (isOnBoard && CanPerformAttack())
+        {
+            RequestAttack();
+            return;
+        }
+
         if (!CanBePlayed())
         {
             ShowCannotPlayFeedback();
@@ -441,6 +448,41 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         }
         
         return false;
+    }
+
+    private bool CanPerformAttack()
+    {
+        if (!isOnBoard) return false;
+        if (GetAttackSlotIndex() < 0) return false;
+        if (GameManager.Instance == null || !GameManager.Instance.CanAttack()) return false;
+        if (Unity.Netcode.NetworkManager.Singleton == null || !Unity.Netcode.NetworkManager.Singleton.IsClient) return false;
+        var localPlayer = Unity.Netcode.NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
+        if (localPlayer == null || localPlayer.GetCurrentActionPoints() <= 0) return false;
+        if (cardVisual == null) return false;
+        if (cardVisual.CurrentCharges <= 0) return false;
+        return true;
+    }
+
+    /// <summary>Slot index for attack RPC: from currentSlot (slot path) or BoardManager list (zone path). Returns -1 if unknown.</summary>
+    private int GetAttackSlotIndex()
+    {
+        if (currentSlot != null)
+            return currentSlot.SlotIndex;
+        if (BoardManager.Instance != null)
+            return BoardManager.Instance.GetCardBoardIndex(gameObject, true);
+        return -1;
+    }
+
+    private void RequestAttack()
+    {
+        int slotIndex = GetAttackSlotIndex();
+        if (slotIndex < 0) return;
+        var localPlayer = Unity.Netcode.NetworkManager.Singleton?.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
+        if (localPlayer != null)
+        {
+            localPlayer.RequestAttackServerRpc(slotIndex);
+            Debug.Log($"CARD DRAGGABLE || Attack scheduled for slot {slotIndex}");
+        }
     }
 
     public void SetOnBoard(bool onBoard)

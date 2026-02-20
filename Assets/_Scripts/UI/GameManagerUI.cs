@@ -252,6 +252,16 @@ public class GameManagerUI : MonoBehaviour
 				healthText.color = Color.white;
 			}
 		}
+
+		if (hpText != null) {
+			hpText.text = $"HP: {health}/20";
+			if (health <= 5)
+				hpText.color = Color.red;
+			else if (health <= 10)
+				hpText.color = Color.yellow;
+			else
+				hpText.color = Color.white;
+		}
 	}
 
 	private void OnDestroy()

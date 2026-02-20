@@ -14,6 +14,9 @@ public class GameManager : NetworkBehaviour
 	[SerializeField] private float revealPhaseDuration = 3f;
 	[SerializeField] private float cleanupPhaseDuration = 2f;
 
+	// Attack intents recorded during planning (attackerClientId, slotIndex). Cleared when processing reveal.
+	private List<(ulong attackerId, int slotIndex)> attackIntents = new List<(ulong, int)>();
+
 	private void Awake()
 	{
 		if (Instance == null) Instance = this;
@@ -129,20 +132,76 @@ public class GameManager : NetworkBehaviour
 		}
 	}
 
+	/// <summary>Server only. Records that this player's card in slot will attack during reveal.</summary>
+	public void RecordAttackIntent(ulong attackerClientId, int slotIndex)
+	{
+		if (!IsServer) return;
+		attackIntents.Add((attackerClientId, slotIndex));
+	}
+
 	private System.Collections.IEnumerator ProcessReveal()
 	{
 		Debug.Log("GAME MANAGER || === REVEAL PHASE ===");
 		
-		// reveal all cards on both boards
+		// reveal all cards on both boards (client clears tilts, then flip + merge)
 		RevealBoardsClientRpc();
 
-		// TODO: Process attacks here in the future
-		// For now, just show the boards for a few seconds
+		// Wait for flip and upgrade/merge to complete before processing attacks (upgrades first, then attack animations)
+		yield return new WaitForSeconds(3f);
+
+		// Process attacks: apply damage, decrement charges, then send data to clients (opponent attacks first, one by one)
+		CardLibrary library = CardManager.Instance != null ? CardManager.Instance.GetCardLibrary() : null;
+		foreach (var (attackerId, slotIndex) in attackIntents)
+		{
+			if (!GetPlayer(attackerId, out PlayerNetwork attacker) || !GetOtherPlayer(attackerId, out PlayerNetwork defender))
+				continue;
+
+			var boardIds = attacker.GetBoardCards();
+			if (slotIndex >= boardIds.Length) continue;
+			int cardId = boardIds[slotIndex];
+			if (cardId == -1) continue;
+
+			int damage = 1;
+			if (library != null)
+			{
+				CardData cardData = library.GetTierOneAssetFromPool(cardId);
+				if (cardData != null) damage = cardData.attackDamage;
+			}
+
+			defender.ApplyDamageServer(damage);
+			int newCharges = attacker.DecrementBoardChargeServer(slotIndex);
+			bool removeCard = newCharges <= 0;
+			if (removeCard)
+				attacker.RemoveBoardCardServer(slotIndex);
+
+			ProcessAttackDataClientRpc(attackerId, slotIndex, damage, newCharges, removeCard);
+		}
+		attackIntents.Clear();
+		ProcessAttacksPlayClientRpc();
 
 		yield return new WaitForSeconds(revealPhaseDuration);
 
 		// move to cleanup phase
 		CurrentPhase.Value = GamePhase.Cleanup;
+	}
+
+	private bool GetPlayer(ulong clientId, out PlayerNetwork player)
+	{
+		player = null;
+		if (NetworkManager.Singleton == null || !NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
+			return false;
+		return client.PlayerObject.TryGetComponent(out player);
+	}
+
+	private bool GetOtherPlayer(ulong excludeId, out PlayerNetwork other)
+	{
+		other = null;
+		foreach (var id in NetworkManager.Singleton.ConnectedClientsIds)
+		{
+			if (id == excludeId) continue;
+			if (GetPlayer(id, out other)) return true;
+		}
+		return false;
 	}
 
 	private System.Collections.IEnumerator ProcessCleanup()
@@ -197,6 +256,24 @@ public class GameManager : NetworkBehaviour
 		if (BoardManager.Instance != null)
 		{
 			BoardManager.Instance.StartRevealSequence();
+		}
+	}
+
+	[ClientRpc]
+	private void ProcessAttackDataClientRpc(ulong attackerClientId, int slotIndex, int damageDealt, int chargesRemaining, bool removeCard)
+	{
+		if (BoardManager.Instance != null)
+		{
+			BoardManager.Instance.ReceiveAttackData(attackerClientId, slotIndex, damageDealt, chargesRemaining, removeCard);
+		}
+	}
+
+	[ClientRpc]
+	private void ProcessAttacksPlayClientRpc()
+	{
+		if (BoardManager.Instance != null)
+		{
+			BoardManager.Instance.PlayAttacksSequence();
 		}
 	}
 

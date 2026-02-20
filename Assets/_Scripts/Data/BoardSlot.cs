@@ -90,8 +90,7 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         {
             CardDraggable cardDraggable = occupyingCard.GetComponent<CardDraggable>();
             if (cardDraggable != null)
-            {   
-                // nested check for fallback
+            {
                 if (isPlayerSlot)
                 {
                     cardDraggable.SelectCard();
@@ -161,6 +160,8 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         if (cardDraggable != null)
         {
             cardDraggable.SetCurrentSlot(this);
+            if (IsPlayerSlot)
+                cardDraggable.SetOnBoard(true);
             cardDraggable.DeselectCard();
         }
 
@@ -206,6 +207,8 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         incomingCard.transform.localScale = Vector3.one;
         
         incomingDraggable.SetCurrentSlot(this);
+        if (IsPlayerSlot)
+            incomingDraggable.SetOnBoard(true);
         incomingDraggable.DeselectCard();
         
         UpdateVisual();
@@ -236,6 +239,9 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         else
         {
             // card came from hand, return displaced card to hand
+            CardDraggable tempDraggable = tempCard.GetComponent<CardDraggable>();
+            if (tempDraggable != null)
+                tempDraggable.SetOnBoard(false);
             if (BoardManager.Instance != null)
             {
                 BoardManager.Instance.ReturnCardToHand(tempCard);
@@ -255,6 +261,7 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         if (cardDraggable != null)
         {
             cardDraggable.SetCurrentSlot(null);
+            cardDraggable.SetOnBoard(false);
         }
 
         UpdateVisual();

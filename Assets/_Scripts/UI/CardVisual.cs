@@ -18,14 +18,23 @@ public class CardVisual : MonoBehaviour
     private bool isFaceDown = false;
     private Sprite cardBackSprite;
 
+    // Attack charges (runtime); when 0 and attack is used, card is removed
+    private int currentCharges = 1;
+    private bool scheduledToAttack = false;
+    private const float AttackTiltAngle = -18f; // lean toward opponent (negative Z rotation)
+
     // Public getter for current card data
     public CardData CurrentCardData => currentCardData;
     public bool IsFaceDown => isFaceDown;
+    public int CurrentCharges => currentCharges;
+    public bool ScheduledToAttack => scheduledToAttack;
 
     public void Initialize(int id, CardData data)
     {
         CardID = id;
         currentCardData = data; // Store the actual CardData reference
+        currentCharges = (data != null && data.maxCharges > 0) ? data.maxCharges : 1;
+        scheduledToAttack = false;
 
         if (cardRenderer != null)
         {
@@ -159,5 +168,48 @@ public class CardVisual : MonoBehaviour
             yield return null;
         }
         transform.localScale = startScale;
+    }
+
+    /// <summary>
+    /// Set whether this card is scheduled to attack (planning phase). Applies tilt visual.
+    /// </summary>
+    public void SetScheduledToAttack(bool scheduled)
+    {
+        scheduledToAttack = scheduled;
+        ApplyAttackTilt();
+    }
+
+    /// <summary>
+    /// Apply or clear attack tilt based on scheduledToAttack.
+    /// </summary>
+    public void ApplyAttackTilt()
+    {
+        float targetZ = scheduledToAttack ? AttackTiltAngle : 0f;
+        transform.localRotation = Quaternion.Euler(0f, 0f, targetZ);
+    }
+
+    /// <summary>
+    /// Set current charges (e.g. after loading from server). Used to sync with server state.
+    /// </summary>
+    public void SetCharges(int charges)
+    {
+        currentCharges = Mathf.Max(0, charges);
+    }
+
+    /// <summary>
+    /// Consume one attack charge. Returns true if charges remain, false if now 0.
+    /// </summary>
+    public bool ConsumeCharge()
+    {
+        currentCharges = Mathf.Max(0, currentCharges - 1);
+        return currentCharges > 0;
+    }
+
+    /// <summary>
+    /// Attack damage from current card data.
+    /// </summary>
+    public int GetAttackDamage()
+    {
+        return currentCardData != null ? currentCardData.attackDamage : 0;
     }
 }
