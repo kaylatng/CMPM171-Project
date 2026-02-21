@@ -193,7 +193,10 @@ public class GameManager : NetworkBehaviour
 	[ClientRpc]
 	private void RevealBoardsClientRpc()
 	{
-		Debug.Log("GAME MANAGER || Revealing boards...");
+		Debug.Log("CLIENT RECIEVED GAME MANAGER || Revealing boards...");
+		Debug.Log($"REVEAL RPC HIT on client {NetworkManager.Singleton.LocalClientId}");
+    	Debug.Log($"BoardManager.Instance is null? {BoardManager.Instance == null}");
+		
 		if (BoardManager.Instance != null)
 		{
 			BoardManager.Instance.StartRevealSequence();

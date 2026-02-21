@@ -422,7 +422,7 @@ public class PlayerNetwork : NetworkBehaviour {
 		// check if this client is the player who played the card
 		if (NetworkManager.Singleton.LocalClientId == OwnerClientId) {
 			Debug.Log($"PLAYER NETWORK || Skipping - this is the player who played the card");
-			return; // skip - we're the player who played it
+			return; 
 		}
 
 		Debug.Log($"PLAYER NETWORK || NotifyOpponentCardPlayedClientRpc - CardID: {cardId}, SlotIndex: {slotIndex}");

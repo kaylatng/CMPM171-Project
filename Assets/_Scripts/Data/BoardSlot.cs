@@ -1,85 +1,86 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using System.Collections;
 
 public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
 {
     [Header("Slot Settings")]
-    [SerializeField] private int slotIndex; // 0, 1, or 2
-    [SerializeField] private bool isPlayerSlot; // true for player, false for opponent
-    
+    [SerializeField] private int slotIndex;
+    [SerializeField] private bool isPlayerSlot;
+
     [Header("Visual Feedback")]
     [SerializeField] private Color emptyColor = new Color(1f, 1f, 1f, 0.3f);
     [SerializeField] private Color occupiedColor = new Color(0.5f, 0.5f, 0.5f, 0.3f);
     [SerializeField] private Color hoverColor = new Color(0.8f, 1f, 0.8f, 0.5f);
     [SerializeField] private Color cannotPlaceColor = new Color(1f, 0.3f, 0.3f, 0.5f);
     [SerializeField] private Color blinkColor = new Color(0.5f, 1f, 0.5f, 0.8f);
-    
+
     [Header("Blinking Settings")]
-    [SerializeField] private float blinkSpeed = 1.5f; // Blinks per second
-    
+    [SerializeField] private float blinkSpeed = 1.5f;
+
     private SpriteRenderer spriteRenderer;
     private GameObject occupyingCard;
     private bool isHovered;
     private bool isBlinking;
     private Coroutine blinkCoroutine;
 
-    public int SlotIndex => slotIndex;
+ 
+    private bool guideVisible = false;
 
-    public bool IsPlayerSlot 
-    { 
-        get 
-        {
-            // check parent zone name - if it's "PlayerBoardZone", it belongs to the local player
-            if (transform.parent != null)
-            {
-                bool isLocalPlayerSlot = transform.parent.name == "PlayerBoardZone";
-                if (isLocalPlayerSlot != isPlayerSlot)
-                {
-                    Debug.Log($"BOARD SLOT || Slot {name} - Serialized isPlayerSlot: {isPlayerSlot}, Actual (by zone): {isLocalPlayerSlot}");
-                }
-                return isLocalPlayerSlot;
-            }
-            return isPlayerSlot;
-        }
-    }
+    public int SlotIndex => slotIndex;
 
     public bool IsOccupied => occupyingCard != null;
     public GameObject OccupyingCard => occupyingCard;
 
-    private void Awake()
+public bool IsPlayerSlot
+{
+    get
     {
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        if (spriteRenderer == null)
+     
+        Transform t = transform;
+        while (t != null)
         {
-            spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
+            if (t.name.StartsWith("PlayerBoardZone")) return true;
+            if (t.name.StartsWith("OpponentBoardZone")) return false;
+            t = t.parent;
         }
-        
-        UpdateVisual();
-    }
 
+        return isPlayerSlot;
+    }
+}
+
+private void Awake()
+{
+    spriteRenderer = GetComponent<SpriteRenderer>();
+    if (spriteRenderer == null) spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
+
+    guideVisible = !IsPlayerSlot;
+
+    ApplyRendererVisibility();
+    UpdateVisual();
+}
     private void Start()
     {
         if (BoardManager.Instance != null)
         {
             BoardManager.Instance.RegisterSlot(this);
         }
-        // Player slots start hidden; they only show when a card is in hand
+
         if (IsPlayerSlot)
         {
-            gameObject.SetActive(false);
+            guideVisible = true;
+            ApplyRendererVisibility();
         }
     }
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (!isPlayerSlot) return; // can't click opponent slots
-        
+        if (!IsPlayerSlot) return;
+
         if (CardDraggable.SelectedCard != null)
         {
-            // check if the selected card can be played
             if (!CardDraggable.SelectedCard.CanBePlayed())
             {
-                Debug.Log($"BOARD SLOT || Cannot place card - insufficient resources or wrong phase");
                 ShowCannotPlaceFeedback();
                 return;
             }
@@ -88,29 +89,21 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         }
         else if (occupyingCard != null)
         {
-            CardDraggable cardDraggable = occupyingCard.GetComponent<CardDraggable>();
-            if (cardDraggable != null)
-            {   
-                // nested check for fallback
-                if (isPlayerSlot)
-                {
-                    cardDraggable.SelectCard();
-                }
-            }
+            CardDraggable cd = occupyingCard.GetComponent<CardDraggable>();
+            if (cd != null) cd.SelectCard();
         }
     }
 
     public void OnDrop(PointerEventData eventData)
     {
-        if (!isPlayerSlot) return;
-        
+        if (!IsPlayerSlot) return;
+
         GameObject droppedObject = eventData.pointerDrag;
         if (droppedObject != null)
         {
-            CardDraggable cardDraggable = droppedObject.GetComponent<CardDraggable>();
-            if (cardDraggable != null)
+            CardDraggable cd = droppedObject.GetComponent<CardDraggable>();
+            if (cd != null)
             {
-                // validation is already done in CardDraggable.OnEndDrag
                 TryPlaceCard(droppedObject);
             }
         }
@@ -120,25 +113,21 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
     {
         if (card == null) return false;
 
-        CardDraggable cardDraggable = card.GetComponent<CardDraggable>();
-        if (cardDraggable == null) return false;
+        CardDraggable cd = card.GetComponent<CardDraggable>();
+        if (cd == null) return false;
 
-        // CLIENT-SIDE VALIDATION: check if card can be played
-        if (!cardDraggable.CanBePlayed())
+        if (!cd.CanBePlayed())
         {
-            Debug.Log($"BOARD SLOT || Cannot place card - validation failed");
             ShowCannotPlaceFeedback();
             return false;
         }
 
-        // if this slot is already occupied, swap cards
         if (IsOccupied)
         {
             SwapCards(card);
             return true;
         }
 
-        // place card in this empty slot
         PlaceCard(card);
         return true;
     }
@@ -147,101 +136,96 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
     {
         if (card == null) return;
 
-        occupyingCard = card;
-
         Transform originalParent = card.transform.parent;
 
-        card.transform.SetParent(transform, false);
+        occupyingCard = card;
 
+        // make sure slot stays active & card doesn't get hidden
+    
+        card.transform.SetParent(transform, false);
         card.transform.localPosition = Vector3.zero;
         card.transform.localRotation = Quaternion.identity;
         card.transform.localScale = Vector3.one;
+
+        CardDraggable cd = card.GetComponent<CardDraggable>();
+        if (cd != null)
+        {
+            cd.SetCurrentSlot(this);
+            cd.DeselectCard();
+            cd.SetOnBoard(true);
+        }
+
         
-        CardDraggable cardDraggable = card.GetComponent<CardDraggable>();
-        if (cardDraggable != null)
-        {
-            cardDraggable.SetCurrentSlot(this);
-            cardDraggable.DeselectCard();
-        }
-
-        SpriteRenderer sr = card.GetComponent<SpriteRenderer>();
-        if (sr != null)
-        {
-            sr.sortingOrder = 0; // Reset to default
-        }
-
+        guideVisible = true; // keep it visible under card
+        ApplyRendererVisibility();
         UpdateVisual();
-        
+
         if (BoardManager.Instance != null)
         {
             bool isFromHand = originalParent != null && originalParent.name == "PlayerHandZone";
             BoardManager.Instance.OnCardPlacedInSlot(this, card, isFromHand);
         }
-
-        Debug.Log($"BOARD SLOT || Card placed in {(isPlayerSlot ? "Player" : "Opponent")} slot {slotIndex}");
     }
 
     private void SwapCards(GameObject incomingCard)
     {
         if (!IsOccupied || incomingCard == null) return;
 
-        CardDraggable incomingDraggable = incomingCard.GetComponent<CardDraggable>();
-        CardDraggable occupyingDraggable = occupyingCard.GetComponent<CardDraggable>();
-        
-        if (incomingDraggable == null || occupyingDraggable == null) return;
+        CardDraggable incoming = incomingCard.GetComponent<CardDraggable>();
+        CardDraggable occupying = occupyingCard.GetComponent<CardDraggable>();
+        if (incoming == null || occupying == null) return;
 
-        // get slot the incoming card came from
-        BoardSlot previousSlot = incomingDraggable.CurrentSlot;
+        BoardSlot previousSlot = incoming.CurrentSlot;
 
-        GameObject tempCard = occupyingCard;
-        
-        // clear this slot
+        GameObject displaced = occupyingCard;
+
+        // Clear this slot
         occupyingCard = null;
         UpdateVisual();
 
+        // Put incoming here
         occupyingCard = incomingCard;
         incomingCard.transform.SetParent(transform, false);
         incomingCard.transform.localPosition = Vector3.zero;
         incomingCard.transform.localRotation = Quaternion.identity;
         incomingCard.transform.localScale = Vector3.one;
-        
-        incomingDraggable.SetCurrentSlot(this);
-        incomingDraggable.DeselectCard();
-        
+
+        incoming.SetCurrentSlot(this);
+        incoming.DeselectCard();
+        incoming.SetOnBoard(true);
+
         UpdateVisual();
 
         if (BoardManager.Instance != null)
         {
             BoardManager.Instance.OnCardPlacedInSlot(this, incomingCard, shouldNotifyServer: true);
         }
-        
-        // incoming card came from another slot, put the displaced card there
+
+        // Put displaced back
         if (previousSlot != null && previousSlot != this)
         {
-            // Don't notify server for the return placement
-            tempCard.transform.SetParent(previousSlot.transform, false);
-            tempCard.transform.localPosition = Vector3.zero;
-            tempCard.transform.localRotation = Quaternion.identity;
-            tempCard.transform.localScale = Vector3.one;
-            
-            previousSlot.occupyingCard = tempCard;
-            occupyingDraggable.SetCurrentSlot(previousSlot);
+            displaced.transform.SetParent(previousSlot.transform, false);
+            displaced.transform.localPosition = Vector3.zero;
+            displaced.transform.localRotation = Quaternion.identity;
+            displaced.transform.localScale = Vector3.one;
+
+            previousSlot.occupyingCard = displaced;
+            occupying.SetCurrentSlot(previousSlot);
+            occupying.SetOnBoard(true);
             previousSlot.UpdateVisual();
-            
+
             if (BoardManager.Instance != null)
             {
-                BoardManager.Instance.OnCardPlacedInSlot(previousSlot, tempCard, shouldNotifyServer: false);
+                BoardManager.Instance.OnCardPlacedInSlot(previousSlot, displaced, shouldNotifyServer: false);
             }
         }
         else
         {
-            // card came from hand, return displaced card to hand
             if (BoardManager.Instance != null)
             {
-                BoardManager.Instance.ReturnCardToHand(tempCard);
+                BoardManager.Instance.ReturnCardToHand(displaced);
             }
         }
-        Debug.Log($"BOARD SLOT || Swapped cards in slot {slotIndex}");
     }
 
     public void RemoveCard(bool notifyManager = true)
@@ -250,103 +234,104 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
 
         GameObject removedCard = occupyingCard;
         occupyingCard = null;
-        
-        CardDraggable cardDraggable = removedCard.GetComponent<CardDraggable>();
-        if (cardDraggable != null)
+
+        CardDraggable cd = removedCard.GetComponent<CardDraggable>();
+        if (cd != null)
         {
-            cardDraggable.SetCurrentSlot(null);
+            cd.SetCurrentSlot(null);
+            cd.SetOnBoard(false);
         }
 
         UpdateVisual();
-        
+
         if (notifyManager && BoardManager.Instance != null)
         {
             BoardManager.Instance.OnCardRemovedFromSlot(this, removedCard);
-        }
-
-        Debug.Log($"BOARD SLOT || Card removed from {(isPlayerSlot ? "Player" : "Opponent")} slot {slotIndex}");
-    }
-
-    public void ClearSlot()
-    {
-        if (IsOccupied)
-        {
-            Destroy(occupyingCard);
-            occupyingCard = null;
-            UpdateVisual();
         }
     }
 
     private void UpdateVisual()
     {
         if (spriteRenderer == null) return;
+        if (isBlinking && blinkCoroutine != null) return;
 
-        // Don't override blinking color
-        if (isBlinking && blinkCoroutine != null)
+      
+        if (!guideVisible)
         {
-            return; // Blinking coroutine handles color
+            ApplyRendererVisibility();
+            return;
         }
 
-        if (isHovered && isPlayerSlot && !IsOccupied)
-        {
-            spriteRenderer.color = hoverColor;
-        }
-        else if (IsOccupied)
-        {
-            spriteRenderer.color = occupiedColor;
-        }
-        else
-        {
-            spriteRenderer.color = emptyColor;
-        }
+        if (isHovered && IsPlayerSlot && !IsOccupied) spriteRenderer.color = hoverColor;
+        else if (IsOccupied) spriteRenderer.color = occupiedColor;
+        else spriteRenderer.color = emptyColor;
+
+        ApplyRendererVisibility();
     }
-    
+
+    private void ApplyRendererVisibility()
+    {
+        if (spriteRenderer == null) return;
+
+        spriteRenderer.enabled = guideVisible;
+    }
+
     public void SetBlinking(bool shouldBlink)
     {
-        // Only affect player slots (show/hide + blink)
         if (!IsPlayerSlot) return;
-        
-        if (shouldBlink)
+
+        // If a card is already placed in this slot, stop blinking 
+        if (IsOccupied)
         {
-            // Show slot and start blinking
-            if (!gameObject.activeSelf)
-            {
-                gameObject.SetActive(true);
-            }
-            if (!isBlinking)
-            {
-                isBlinking = true;
-                if (blinkCoroutine != null)
-                {
-                    StopCoroutine(blinkCoroutine);
-                }
-                blinkCoroutine = StartCoroutine(BlinkCoroutine());
-            }
-        }
-        else
-        {
-            // Stop blinking and hide slot
             isBlinking = false;
             if (blinkCoroutine != null)
             {
                 StopCoroutine(blinkCoroutine);
                 blinkCoroutine = null;
             }
-            UpdateVisual();
-            gameObject.SetActive(false);
+            guideVisible = false; 
+            ApplyRendererVisibility();
+            return;
         }
+
+        if (shouldBlink)
+        {
+            guideVisible = true;
+            ApplyRendererVisibility();
+
+            if (!isBlinking)
+            {
+                isBlinking = true;
+                if (blinkCoroutine != null) StopCoroutine(blinkCoroutine);
+                blinkCoroutine = StartCoroutine(BlinkCoroutine());
+            }
+        }
+        else
+        {
+            isBlinking = false;
+            if (blinkCoroutine != null)
+            {
+                StopCoroutine(blinkCoroutine);
+                blinkCoroutine = null;
+            }
+
+            
+            guideVisible = false;
+            ApplyRendererVisibility();
+        }
+
+        UpdateVisual();
     }
-    
-    private System.Collections.IEnumerator BlinkCoroutine()
+
+    private IEnumerator BlinkCoroutine()
     {
         Color baseColor = IsOccupied ? occupiedColor : emptyColor;
-        
+
         while (isBlinking)
         {
             float elapsed = 0f;
-            float halfCycle = 1f / blinkSpeed / 2f; // Half cycle duration
-            
-            // Fade in to blink color
+            float halfCycle = 1f / blinkSpeed / 2f;
+
             while (elapsed < halfCycle && isBlinking)
             {
                 elapsed += Time.deltaTime;
@@ -354,10 +339,9 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
                 spriteRenderer.color = Color.Lerp(baseColor, blinkColor, t);
                 yield return null;
             }
-            
+
             elapsed = 0f;
-            
-            // Fade out from blink color
+
             while (elapsed < halfCycle && isBlinking)
             {
                 elapsed += Time.deltaTime;
@@ -366,8 +350,7 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
                 yield return null;
             }
         }
-        
-        // Ensure we restore normal color when stopping
+
         UpdateVisual();
     }
 
@@ -375,21 +358,22 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
     {
         if (spriteRenderer != null)
         {
+            guideVisible = true;
+            ApplyRendererVisibility();
             StartCoroutine(FlashCannotPlace());
         }
     }
 
-    private System.Collections.IEnumerator FlashCannotPlace()
+    private IEnumerator FlashCannotPlace()
     {
-        Color original = spriteRenderer.color;
         spriteRenderer.color = cannotPlaceColor;
         yield return new WaitForSeconds(0.2f);
-        UpdateVisual(); // restore proper color based on state
+        UpdateVisual();
     }
 
     public void OnPointerEnter()
     {
-        if (!isPlayerSlot) return;
+        if (!IsPlayerSlot) return;
         isHovered = true;
         UpdateVisual();
     }
@@ -400,21 +384,6 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         UpdateVisual();
     }
 
-    private void OnMouseEnter()
-    {
-        OnPointerEnter();
-    }
-
-    private void OnMouseExit()
-    {
-        OnPointerExit();
-    }
-
-    public void SetSlotProperties(int index, bool playerSlot)
-    {
-        slotIndex = index;
-        isPlayerSlot = playerSlot;
-        gameObject.name = $"{(playerSlot ? "Player" : "Opponent")}Slot_{index}";
-        Debug.Log($"BOARD SLOT || Set slot properties - Index: {slotIndex}, IsPlayer: {isPlayerSlot}, Name: {gameObject.name}");
-    }
+    private void OnMouseEnter() => OnPointerEnter();
+    private void OnMouseExit() => OnPointerExit();
 }

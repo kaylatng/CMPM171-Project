@@ -254,12 +254,18 @@ public class CardManager : MonoBehaviour
                 Time.deltaTime * cardMoveSpeed
             );
 
-            // Update sorting order
-            SpriteRenderer sr = cardData.cardObject.GetComponent<SpriteRenderer>();
-            if (sr != null)
+            CardVisual cv = cardData.cardObject.GetComponent<CardVisual>();
+            if (cv != null)
             {
-                sr.sortingOrder = finalSortingOrder;
+                cv.SetSortingOrder(finalSortingOrder);
             }
+            else
+            {
+                SpriteRenderer sr = cardData.cardObject.GetComponent<SpriteRenderer>();
+                if (sr != null)
+                    sr.sortingOrder = finalSortingOrder;
+            }
+
         }
     }
 
@@ -355,37 +361,48 @@ public class CardManager : MonoBehaviour
     public void RemoveCardFromHand(GameObject cardObject)
     {
         if (cardObject == null) return;
-        
+
         Transform parent = cardObject.transform.parent;
-        
-        // If card was unparented (e.g., during drag), check which hand it belongs to
+
+     // If card is NOT currently in a hand zone, don't touch its parent.
+     // BoardManager already re-parented it to PlayerBoardZone (or a slot).
+     if (parent != null && parent != playerHandZone && parent != opponentHandZone)
+        {
+            // Just remove from tracking lists if it exists there.
+            playerHandCards.RemoveAll(c => c.cardObject == cardObject);
+            opponentHandCards.RemoveAll(c => c.cardObject == cardObject);
+            return;
+        }
+        // If card was unparented (such as during drag), figure out which hand it came from
         if (parent == null)
         {
-            // Check if card is in player hand list
             if (playerHandCards.Exists(c => c.cardObject == cardObject))
-            {
+             {
                 parent = playerHandZone;
             }
-            // Check if card is in opponent hand list
             else if (opponentHandCards.Exists(c => c.cardObject == cardObject))
             {
                 parent = opponentHandZone;
             }
-        }
-        
-        // Remove from tracking lists
-        playerHandCards.RemoveAll(c => c.cardObject == cardObject);
-        opponentHandCards.RemoveAll(c => c.cardObject == cardObject);
-        
-        // Deparent it - don't destroy
+     }
+
+    // Remove from tracking lists
+    playerHandCards.RemoveAll(c => c.cardObject == cardObject);
+    opponentHandCards.RemoveAll(c => c.cardObject == cardObject);
+
+    // Only de-parent if it was actually in a hand zone
+    if (cardObject.transform.parent == playerHandZone || cardObject.transform.parent == opponentHandZone)
+    {
         cardObject.transform.SetParent(null);
-        
-        // Rearrange remaining cards in hand
-        if (parent != null && (parent == playerHandZone || parent == opponentHandZone))
-        {
-            ArrangeCardsInHand(parent);
-        }
     }
+
+    // Rearrange remaining cards in hand
+    if (parent != null && (parent == playerHandZone || parent == opponentHandZone))
+    {
+        ArrangeCardsInHand(parent);
+    }
+}
+
 
     public void RemoveCardFromZone(GameObject cardObject)
     {
