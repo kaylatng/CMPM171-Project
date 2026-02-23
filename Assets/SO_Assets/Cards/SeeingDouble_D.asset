@@ -16,11 +16,12 @@ MonoBehaviour:
   cardID: 700
   tier: 1
   isModifier: 1
+  nextTier: {fileID: 0}
   manaCost: 0
   attackDamage: 0
-  maxCharges: 0
+  maxCharges: 1
   destroyOnEmpty: 1
   cardArt: {fileID: -6591706479325965393, guid: 4b80deb637759b44a80c2d557e950623, type: 3}
   themeColor: {r: 0, g: 0, b: 0, a: 0}
-  nextTier: {fileID: 0}
+  tierFrame: {fileID: 0}
   description: 

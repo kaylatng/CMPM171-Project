@@ -134,9 +134,27 @@ public class PlayerNetwork : NetworkBehaviour {
 	}
 
 	private void OnLocalPlayerDataChanged(PlayerData previousValue, PlayerData newValue) {
-		// update UI with new values
+		// update UI with new values (pending attack deduction applied so display matches intent during Planning)
 		if (GameManagerUI.Instance != null) {
-			GameManagerUI.Instance.UpdateResourceUI(newValue.ActionPoints, newValue.Mana, newValue.Health);
+			GameManagerUI.Instance.OnServerResourceUpdate(newValue.ActionPoints, newValue.Mana, newValue.Health);
+		}
+	}
+
+	// Forwarder for external subscribers; NetworkVariable.OnValueChanged uses a different delegate type than Action<,>.
+	private Action<PlayerData, PlayerData> dataChangedHandler;
+	private void ForwardDataChanged(PlayerData previous, PlayerData next) => dataChangedHandler?.Invoke(previous, next);
+
+	/// <summary>Subscribe to this player's replicated data changes (e.g. so opponent can sync board from our BoardCardIds).</summary>
+	public void SubscribeToDataChanged(Action<PlayerData, PlayerData> handler) {
+		dataChangedHandler = handler;
+		playerData.OnValueChanged += ForwardDataChanged;
+	}
+
+	/// <summary>Unsubscribe from data changes (e.g. when BoardManager is destroyed).</summary>
+	public void UnsubscribeFromDataChanged(Action<PlayerData, PlayerData> handler) {
+		if (dataChangedHandler == handler) {
+			playerData.OnValueChanged -= ForwardDataChanged;
+			dataChangedHandler = null;
 		}
 	}
 
@@ -308,7 +326,13 @@ public class PlayerNetwork : NetworkBehaviour {
 			return;
 		}
 
-		// 3. SLOT VALIDATION
+		// 3. MANA CHECK (attack costs 1 Mana)
+		if (playerData.Value.Mana < 1) {
+			Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} - Not enough Mana to attack!");
+			return;
+		}
+
+		// 4. SLOT VALIDATION
 		if (slotIndex < 0 || slotIndex >= 3) {
 			Debug.Log($"PLAYER NETWORK || Invalid slot index for attack: {slotIndex}");
 			return;
@@ -326,6 +350,7 @@ public class PlayerNetwork : NetworkBehaviour {
 		}
 
 		data.ActionPoints--;
+		data.Mana--;
 		playerData.Value = data;
 
 		if (GameManager.Instance != null) {
@@ -388,21 +413,7 @@ public class PlayerNetwork : NetworkBehaviour {
 			return;
 		}
 
-		// 5. MANA CHECK - verify player can afford the card
-		CardLibrary library = CardManager.Instance?.GetCardLibrary();
-		if (library != null) {
-			CardData cardData = library.GetTierOneAssetFromPool(cardId);
-			if (cardData != null && cardData.manaCost > data.Mana) {
-				Debug.Log($"PLAYER NETWORK || Not enough mana! Card costs {cardData.manaCost}, player has {data.Mana}");
-				return;
-			}
-			
-			// DEDUCT MANA COST
-			if (cardData != null && cardData.manaCost > 0) {
-				data.Mana -= cardData.manaCost;
-				Debug.Log($"PLAYER NETWORK || Spent {cardData.manaCost} mana. {data.Mana} remaining");
-			}
-		}
+		// Mana is only spent when a card is tapped to attack (ScheduleAttackServerRpc), not when playing to board.
 
 		// DEDUCT 1 ACTION POINT for playing the card
 		data.ActionPoints--;
@@ -437,6 +448,7 @@ public class PlayerNetwork : NetworkBehaviour {
 
 		// place new card in slot and set attack charges (default 1 if asset has 0)
 		int maxCharges = 1;
+		CardLibrary library = CardManager.Instance?.GetCardLibrary();
 		if (library != null) {
 			CardData cardData = library.GetTierOneAssetFromPool(cardId);
 			if (cardData != null && cardData.maxCharges > 0) maxCharges = cardData.maxCharges;
@@ -447,16 +459,8 @@ public class PlayerNetwork : NetworkBehaviour {
 
 		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} played card {cardId} to slot {slotIndex}");
 
-		// notify opponent to show card back on their board (not revealed yet)
-		ulong opponentId = GetOpponentId(OwnerClientId);
-		if (opponentId != OwnerClientId) {
-			ClientRpcParams opponentParams = new ClientRpcParams {
-				Send = new ClientRpcSendParams {
-					TargetClientIds = new ulong[] { opponentId }
-				}
-			};
-			NotifyOpponentCardPlayedClientRpc(cardId, slotIndex, opponentParams);
-		}
+		// Opponent board is updated only from replicated BoardCardIds (BoardManager.SyncOpponentBoardFromServerState),
+		// so we do not send NotifyOpponentCardPlayedClientRpc here — that caused wrong counts (e.g. 1 card shown as 2, or 2 as 1).
 	}
 
 	[ClientRpc]

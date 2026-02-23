@@ -17,9 +17,9 @@ MonoBehaviour:
   tier: 2
   isModifier: 0
   nextTier: {fileID: 11400000, guid: 3cfe536188f7ef9499cd6e82800a13df, type: 2}
-  manaCost: 0
-  attackDamage: 0
-  maxCharges: 0
+  manaCost: 1
+  attackDamage: 4
+  maxCharges: 2
   destroyOnEmpty: 1
   cardArt: {fileID: -3139299014816269367, guid: 450e0e3977bf4d44dab73472c447c8be, type: 3}
   themeColor: {r: 0, g: 0, b: 0, a: 0}

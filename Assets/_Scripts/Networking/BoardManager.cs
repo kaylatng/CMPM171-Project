@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.Netcode;
+using Unity.Collections;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -56,6 +57,10 @@ public class BoardManager : MonoBehaviour
     // Attack phase: queue of attack data; played one by one with opponent attacks first
     private List<AttackResultData> pendingAttackResults = new List<AttackResultData>();
 
+    // Opponent board sync from authoritative server state (so multiple cards / pairs show correctly)
+    private PlayerNetwork cachedOpponentPlayer;
+    private bool opponentBoardSyncSubscribed;
+
     public struct AttackResultData
     {
         public ulong attackerClientId;
@@ -77,6 +82,16 @@ public class BoardManager : MonoBehaviour
         }
     }
 
+    private void OnDestroy()
+    {
+        if (cachedOpponentPlayer != null && opponentBoardSyncSubscribed)
+        {
+            cachedOpponentPlayer.UnsubscribeFromDataChanged(OnOpponentPlayerDataChanged);
+            opponentBoardSyncSubscribed = false;
+            cachedOpponentPlayer = null;
+        }
+    }
+
     private void Start()
     {
         SetupBoardZones();
@@ -90,6 +105,97 @@ public class BoardManager : MonoBehaviour
         
         // Update slot blinking based on card selection/dragging
         UpdateSlotBlinking();
+
+        // Subscribe to opponent's board state once we have 2 clients (so opponent board stays in sync with server)
+        EnsureOpponentBoardSyncSubscribed();
+    }
+
+    private void EnsureOpponentBoardSyncSubscribed()
+    {
+        if (opponentBoardSyncSubscribed || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsClient)
+            return;
+        if (NetworkManager.Singleton.ConnectedClientsList.Count < 2)
+            return;
+
+        ulong localId = NetworkManager.Singleton.LocalClientId;
+        foreach (var kvp in NetworkManager.Singleton.ConnectedClients)
+        {
+            if (kvp.Key == localId) continue;
+            var client = kvp.Value;
+            if (client?.PlayerObject == null) continue;
+            var otherPlayer = client.PlayerObject.GetComponent<PlayerNetwork>();
+            if (otherPlayer == null) continue;
+
+            cachedOpponentPlayer = otherPlayer;
+            cachedOpponentPlayer.SubscribeToDataChanged(OnOpponentPlayerDataChanged);
+            opponentBoardSyncSubscribed = true;
+            // Initial sync so board matches server state (e.g. after reconnect or late join)
+            SyncOpponentBoardFromServerState(cachedOpponentPlayer.GetBoardCards());
+            Debug.Log($"BOARD MANAGER || Subscribed to opponent board sync (client {kvp.Key})");
+            break;
+        }
+    }
+
+    private void OnOpponentPlayerDataChanged(PlayerNetwork.PlayerData previous, PlayerNetwork.PlayerData next)
+    {
+        SyncOpponentBoardFromServerState(next.BoardCardIds);
+    }
+
+    /// <summary>Place a card on the opponent board from server state sync (does not remove from opponent hand).</summary>
+    private void PlaceOpponentCardFromSync(int cardId, int index)
+    {
+        if (CardManager.Instance == null) return;
+        GameObject card = Instantiate(CardManager.Instance.GetCardPrefab());
+        if (card == null) return;
+        CardManager.Instance.InitializeCardVisual(card, cardId, false);
+        CardDraggable draggable = card.GetComponent<CardDraggable>();
+        if (draggable != null) { draggable.enabled = false; draggable.SetOnBoard(true); }
+        CardShadow shadow = card.GetComponent<CardShadow>();
+        if (shadow == null) card.AddComponent<CardShadow>();
+        TryPlaceCard(card, false, index);
+    }
+
+    /// <summary>Rebuild opponent board from authoritative server state so multiple cards (e.g. pair) show correctly on opponent view.</summary>
+    private void SyncOpponentBoardFromServerState(FixedList32Bytes<int> boardCardIds)
+    {
+        if (boardCardIds.Length == 0)
+        {
+            ClearOpponentBoardCardsOnly();
+            return;
+        }
+
+        // Check if current opponent board already matches (avoid flicker)
+        if (opponentBoardCards.Count == boardCardIds.Length)
+        {
+            bool match = true;
+            for (int i = 0; i < opponentBoardCards.Count && i < boardCardIds.Length; i++)
+            {
+                var visual = opponentBoardCards[i].GetComponent<CardVisual>();
+                if (visual == null || visual.CardID != boardCardIds[i]) { match = false; break; }
+            }
+            if (match) return;
+        }
+
+        ClearOpponentBoardCardsOnly();
+        for (int i = 0; i < boardCardIds.Length; i++)
+        {
+            int cardId = boardCardIds[i];
+            if (cardId >= 0)
+                PlaceOpponentCardFromSync(cardId, i);
+        }
+    }
+
+    private void ClearOpponentBoardCardsOnly()
+    {
+        List<GameObject> copy = new List<GameObject>(opponentBoardCards);
+        foreach (GameObject card in copy)
+        {
+            opponentBoardCards.Remove(card);
+            cardBoardIndices.Remove(card);
+            cardTargetPositions.Remove(card);
+            if (card != null) Destroy(card);
+        }
+        ArrangeCardsOnBoard(false);
     }
     
     private void UpdateSlotBlinking()
@@ -523,6 +629,48 @@ public class BoardManager : MonoBehaviour
         CheckAndMergeCards(isPlayerBoard);
     }
 
+    /// <summary>Number of local player board cards currently with attack intent (tilt). Used for UI resource preview.</summary>
+    public int GetLocalPendingAttackCount()
+    {
+        var seen = new HashSet<GameObject>();
+        int count = 0;
+        foreach (BoardSlot slot in playerSlots)
+        {
+            if (slot?.OccupyingCard == null) continue;
+            if (!seen.Add(slot.OccupyingCard)) continue;
+            var d = slot.OccupyingCard.GetComponent<CardDraggable>();
+            if (d != null && d.IsAttacking) count++;
+        }
+        foreach (GameObject go in playerBoardCards)
+        {
+            if (go == null || !seen.Add(go)) continue;
+            var d = go.GetComponent<CardDraggable>();
+            if (d != null && d.IsAttacking) count++;
+        }
+        return count;
+    }
+
+    /// <summary>Submit all local attack intents to the server (call when player clicks Ready). Clears local isAttacking after each submit.</summary>
+    public void SubmitLocalAttackIntents()
+    {
+        var seen = new HashSet<GameObject>();
+        foreach (BoardSlot slot in playerSlots)
+        {
+            if (slot?.OccupyingCard == null) continue;
+            if (!seen.Add(slot.OccupyingCard)) continue;
+            var d = slot.OccupyingCard.GetComponent<CardDraggable>();
+            if (d != null && d.IsAttacking)
+                d.SubmitAttackIntent();
+        }
+        foreach (GameObject go in playerBoardCards)
+        {
+            if (go == null || !seen.Add(go)) continue;
+            var d = go.GetComponent<CardDraggable>();
+            if (d != null && d.IsAttacking)
+                d.SubmitAttackIntent();
+        }
+    }
+
     /// <summary>
     /// Clear attack tilt on all player board cards. Call at start of reveal so cards are straight before animations.
     /// </summary>
@@ -535,6 +683,9 @@ public class BoardManager : MonoBehaviour
             CardVisual cv = slot.OccupyingCard.GetComponent<CardVisual>();
             if (cv != null)
                 cv.SetScheduledToAttack(false);
+            var d = slot.OccupyingCard.GetComponent<CardDraggable>();
+            if (d != null)
+                d.ClearAttackIntent();
         }
         // Player zone-placed cards
         foreach (GameObject card in playerBoardCards)
@@ -543,6 +694,9 @@ public class BoardManager : MonoBehaviour
             CardVisual cv = card.GetComponent<CardVisual>();
             if (cv != null)
                 cv.SetScheduledToAttack(false);
+            var d = card.GetComponent<CardDraggable>();
+            if (d != null)
+                d.ClearAttackIntent();
         }
     }
 
