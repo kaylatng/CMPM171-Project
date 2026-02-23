@@ -191,14 +191,19 @@ public class BoardManager : MonoBehaviour
             int needCardId = boardCardIds[i];
             if (needCardId < 0) continue;
 
+            bool replacedSlot = false;
             if (i < opponentBoardCards.Count)
             {
                 var visual = opponentBoardCards[i].GetComponent<CardVisual>();
                 if (visual != null && visual.CardID == needCardId)
                     continue; // same card at same slot, keep it
                 RemoveOneOpponentCardAt(i);
+                replacedSlot = true; // card was swapped back to hand on server, so hand count unchanged
             }
             PlaceOpponentCardFromSync(needCardId, i);
+            // New card from opponent hand (empty slot): remove one card from opponent hand on our view
+            if (!replacedSlot && CardManager.Instance != null)
+                CardManager.Instance.RemoveOneOpponentHandCard();
         }
 
         // Remove excess cards (server has fewer than we do)
