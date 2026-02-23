@@ -17,6 +17,7 @@ public class CardVisual : MonoBehaviour
     // Face-down state (opponent cards until reveal phase)
     private bool isFaceDown = false;
     private Sprite cardBackSprite;
+    private bool hasBeenRevealed; // once true, card stays face-up
 
     // Attack charges (runtime); when 0 and attack is used, card is removed
     private int currentCharges = 1;
@@ -87,11 +88,14 @@ public class CardVisual : MonoBehaviour
 
     /// <summary>
     /// Set card face-down (card back) or face-up (show art). For opponent cards until reveal.
+    /// Once revealed, the card stays face-up (ignores future SetFaceDown(true)).
     /// </summary>
     public void SetFaceDown(bool faceDown, Sprite cardBack = null)
     {
-        isFaceDown = faceDown;
         if (cardBack != null) cardBackSprite = cardBack;
+        if (faceDown && hasBeenRevealed) return; // keep face-up after first reveal
+        if (!faceDown) hasBeenRevealed = true;
+        isFaceDown = faceDown;
 
         if (isFaceDown)
         {
