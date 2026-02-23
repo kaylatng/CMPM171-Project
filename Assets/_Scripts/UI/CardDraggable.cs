@@ -26,6 +26,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     private bool isDragging;
     private bool isSelected;
     private bool isOnBoard;
+    private bool isAttacking; // Toggle attack intent during Planning; committed when Ready
     
     // Dragging state
     private Vector3 dragOffset;
@@ -42,6 +43,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     public bool IsDragging => isDragging;
     public bool IsSelected => isSelected;
     public bool IsOnBoard => isOnBoard;
+    public bool IsAttacking => isAttacking;
     public BoardSlot CurrentSlot => currentSlot;
 
     private void Awake()
@@ -62,6 +64,25 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     {
         if (isDragging) return;
         if (!IsPlayerCard()) return;
+
+        // Toggle Attack (Planning Phase only): first tap = set attack intent + tilt, second tap = undo
+        if (isOnBoard && GameManager.Instance != null && GameManager.Instance.CanAttack())
+        {
+            if (isAttacking)
+            {
+                SetAttackIntent(false);
+                return;
+            }
+            if (CanToggleAttackOn())
+            {
+                SetAttackIntent(true);
+                return;
+            }
+            // Can't turn attack on (insufficient resources or charges) - optional feedback
+            if (IsOnBoard && GetAttackSlotIndex() >= 0)
+                ShowCannotPlayFeedback();
+            return;
+        }
 
         if (!CanBePlayed())
         {
@@ -441,6 +462,78 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         }
         
         return false;
+    }
+
+    /// <summary>Can we turn attack intent ON? Requires 1 Mana, 1 AP (after pending), and >0 charges.</summary>
+    private bool CanToggleAttackOn()
+    {
+        if (!isOnBoard || isAttacking) return false;
+        if (GetAttackSlotIndex() < 0) return false;
+        if (GameManager.Instance == null || !GameManager.Instance.CanAttack()) return false;
+        if (Unity.Netcode.NetworkManager.Singleton == null || !Unity.Netcode.NetworkManager.Singleton.IsClient) return false;
+        var localPlayer = Unity.Netcode.NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
+        if (localPlayer == null) return false;
+        int pending = BoardManager.Instance != null ? BoardManager.Instance.GetLocalPendingAttackCount() : 0;
+        int effectiveMana = localPlayer.GetCurrentMana() - pending;
+        int effectiveAP = localPlayer.GetCurrentActionPoints() - pending;
+        if (effectiveMana < 1 || effectiveAP < 1) return false;
+        if (cardVisual == null || cardVisual.CurrentCharges <= 0) return false;
+        return true;
+    }
+
+    private bool CanPerformAttack()
+    {
+        if (!isOnBoard) return false;
+        if (GetAttackSlotIndex() < 0) return false;
+        if (GameManager.Instance == null || !GameManager.Instance.CanAttack()) return false;
+        if (Unity.Netcode.NetworkManager.Singleton == null || !Unity.Netcode.NetworkManager.Singleton.IsClient) return false;
+        var localPlayer = Unity.Netcode.NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
+        if (localPlayer == null || localPlayer.GetCurrentActionPoints() <= 0) return false;
+        if (cardVisual == null) return false;
+        if (cardVisual.CurrentCharges <= 0) return false;
+        return true;
+    }
+
+    public void SetAttackIntent(bool attacking)
+    {
+        if (isAttacking == attacking) return;
+        isAttacking = attacking;
+        if (cardVisual != null)
+            cardVisual.SetScheduledToAttack(attacking);
+    }
+
+    /// <summary>Clear local attack intent (e.g. after submitting on Ready or at start of Reveal).</summary>
+    public void ClearAttackIntent()
+    {
+        if (!isAttacking) return;
+        isAttacking = false;
+        if (cardVisual != null)
+            cardVisual.SetScheduledToAttack(false);
+    }
+
+    /// <summary>Slot index for attack RPC: from currentSlot (slot path) or BoardManager list (zone path). Returns -1 if unknown.</summary>
+    private int GetAttackSlotIndex()
+    {
+        if (currentSlot != null)
+            return currentSlot.SlotIndex;
+        if (BoardManager.Instance != null)
+            return BoardManager.Instance.GetCardBoardIndex(gameObject, true);
+        return -1;
+    }
+
+    /// <summary>Send attack intent to server (called when player confirms Ready). Clears local isAttacking after sending.</summary>
+    public void SubmitAttackIntent()
+    {
+        if (!isAttacking) return;
+        int slotIndex = GetAttackSlotIndex();
+        if (slotIndex < 0) return;
+        var localPlayer = Unity.Netcode.NetworkManager.Singleton?.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
+        if (localPlayer != null)
+        {
+            localPlayer.RequestAttackServerRpc(slotIndex);
+            ClearAttackIntent();
+            Debug.Log($"CARD DRAGGABLE || Attack submitted for slot {slotIndex}");
+        }
     }
 
     public void SetOnBoard(bool onBoard)

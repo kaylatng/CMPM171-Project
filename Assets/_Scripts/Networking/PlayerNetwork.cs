@@ -33,6 +33,7 @@ public class PlayerNetwork : NetworkBehaviour {
 		public FixedString128Bytes PlayerName;
 		public FixedList32Bytes<int> HandCardIds;
 		public FixedList32Bytes<int> BoardCardIds;
+		public FixedList32Bytes<int> BoardCardCharges; // attack charges per slot (same order as BoardCardIds)
 
 		public void UpdateHandCount() {
 			CardsInHandCount = HandCardIds.Length;
@@ -83,6 +84,25 @@ public class PlayerNetwork : NetworkBehaviour {
 					serializer.SerializeValue(ref cardId);
 				}
 			}
+
+			// serialize BoardCardCharges
+			if (serializer.IsReader) {
+				int chargeCount = 0;
+				serializer.SerializeValue(ref chargeCount);
+				BoardCardCharges.Clear();
+				for (int i = 0; i < chargeCount; i++) {
+					int ch = 0;
+					serializer.SerializeValue(ref ch);
+					BoardCardCharges.Add(ch);
+				}
+			} else {
+				int chargeCount = BoardCardCharges.Length;
+				serializer.SerializeValue(ref chargeCount);
+				for (int i = 0; i < BoardCardCharges.Length; i++) {
+					int ch = BoardCardCharges[i];
+					serializer.SerializeValue(ref ch);
+				}
+			}
 		}
 	}
 
@@ -114,9 +134,27 @@ public class PlayerNetwork : NetworkBehaviour {
 	}
 
 	private void OnLocalPlayerDataChanged(PlayerData previousValue, PlayerData newValue) {
-		// update UI with new values
+		// update UI with new values (pending attack deduction applied so display matches intent during Planning)
 		if (GameManagerUI.Instance != null) {
-			GameManagerUI.Instance.UpdateResourceUI(newValue.ActionPoints, newValue.Mana, newValue.Health);
+			GameManagerUI.Instance.OnServerResourceUpdate(newValue.ActionPoints, newValue.Mana, newValue.Health);
+		}
+	}
+
+	// Forwarder for external subscribers; NetworkVariable.OnValueChanged uses a different delegate type than Action<,>.
+	private Action<PlayerData, PlayerData> dataChangedHandler;
+	private void ForwardDataChanged(PlayerData previous, PlayerData next) => dataChangedHandler?.Invoke(previous, next);
+
+	/// <summary>Subscribe to this player's replicated data changes (e.g. so opponent can sync board from our BoardCardIds).</summary>
+	public void SubscribeToDataChanged(Action<PlayerData, PlayerData> handler) {
+		dataChangedHandler = handler;
+		playerData.OnValueChanged += ForwardDataChanged;
+	}
+
+	/// <summary>Unsubscribe from data changes (e.g. when BoardManager is destroyed).</summary>
+	public void UnsubscribeFromDataChanged(Action<PlayerData, PlayerData> handler) {
+		if (dataChangedHandler == handler) {
+			playerData.OnValueChanged -= ForwardDataChanged;
+			dataChangedHandler = null;
 		}
 	}
 
@@ -273,6 +311,64 @@ public class PlayerNetwork : NetworkBehaviour {
 	}
 
 	[ServerRpc]
+	public void RequestAttackServerRpc(int slotIndex, ServerRpcParams serverRpcParams = default) {
+		if (!IsServer) return;
+
+		// 1. PHASE CHECK - can only attack during planning phase
+		if (GameManager.Instance == null || GameManager.Instance.CurrentPhase.Value != GameManager.GamePhase.Planning) {
+			Debug.Log("PLAYER NETWORK || Cannot attack - not in Planning phase");
+			return;
+		}
+
+		// 2. AP CHECK
+		if (playerData.Value.ActionPoints <= 0) {
+			Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} - Not enough AP to attack!");
+			return;
+		}
+
+		// 3. MANA CHECK (attack costs 1 Mana)
+		if (playerData.Value.Mana < 1) {
+			Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} - Not enough Mana to attack!");
+			return;
+		}
+
+		// 4. SLOT VALIDATION
+		if (slotIndex < 0 || slotIndex >= 3) {
+			Debug.Log($"PLAYER NETWORK || Invalid slot index for attack: {slotIndex}");
+			return;
+		}
+
+		PlayerData data = playerData.Value;
+
+		// Ensure board lists have 3 slots
+		while (data.BoardCardIds.Length < 3) data.BoardCardIds.Add(-1);
+		while (data.BoardCardCharges.Length < 3) data.BoardCardCharges.Add(0);
+
+		if (data.BoardCardIds[slotIndex] == -1 || data.BoardCardCharges[slotIndex] <= 0) {
+			Debug.Log($"PLAYER NETWORK || No card or no attack charges in slot {slotIndex}");
+			return;
+		}
+
+		data.ActionPoints--;
+		data.Mana--;
+		playerData.Value = data;
+
+		if (GameManager.Instance != null) {
+			GameManager.Instance.RecordAttackIntent(OwnerClientId, slotIndex);
+		}
+
+		NotifyAttackScheduledClientRpc(OwnerClientId, slotIndex);
+		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} scheduled attack with slot {slotIndex}");
+	}
+
+	[ClientRpc]
+	private void NotifyAttackScheduledClientRpc(ulong attackerClientId, int slotIndex) {
+		if (BoardManager.Instance != null) {
+			BoardManager.Instance.OnAttackScheduled(attackerClientId, slotIndex);
+		}
+	}
+
+	[ServerRpc]
 	public void RemoveCardFromHandServerRpc(int cardId) {
 		PlayerData data = playerData.Value;
 
@@ -317,21 +413,7 @@ public class PlayerNetwork : NetworkBehaviour {
 			return;
 		}
 
-		// 5. MANA CHECK - verify player can afford the card
-		CardLibrary library = CardManager.Instance?.GetCardLibrary();
-		if (library != null) {
-			CardData cardData = library.GetTierOneAssetFromPool(cardId);
-			if (cardData != null && cardData.manaCost > data.Mana) {
-				Debug.Log($"PLAYER NETWORK || Not enough mana! Card costs {cardData.manaCost}, player has {data.Mana}");
-				return;
-			}
-			
-			// DEDUCT MANA COST
-			if (cardData != null && cardData.manaCost > 0) {
-				data.Mana -= cardData.manaCost;
-				Debug.Log($"PLAYER NETWORK || Spent {cardData.manaCost} mana. {data.Mana} remaining");
-			}
-		}
+		// Mana is only spent when a card is tapped to attack (ScheduleAttackServerRpc), not when playing to board.
 
 		// DEDUCT 1 ACTION POINT for playing the card
 		data.ActionPoints--;
@@ -341,9 +423,12 @@ public class PlayerNetwork : NetworkBehaviour {
 		data.HandCardIds.Remove(cardId);
 		data.UpdateHandCount();
 
-		// ensure BoardCardIds has 3 slots (initialize with -1 for empty)
+		// ensure BoardCardIds and BoardCardCharges have 3 slots
 		while (data.BoardCardIds.Length < 3) {
 			data.BoardCardIds.Add(-1);
+		}
+		while (data.BoardCardCharges.Length < 3) {
+			data.BoardCardCharges.Add(0);
 		}
 
 		// if slot already has a card, return that card to hand (no extra AP cost)
@@ -361,22 +446,21 @@ public class PlayerNetwork : NetworkBehaviour {
 			ReturnCardToHandClientRpc(replacedCardId, playerParams);
 		}
 
-		// place new card in slot
+		// place new card in slot and set attack charges (default 1 if asset has 0)
+		int maxCharges = 1;
+		CardLibrary library = CardManager.Instance?.GetCardLibrary();
+		if (library != null) {
+			CardData cardData = library.GetTierOneAssetFromPool(cardId);
+			if (cardData != null && cardData.maxCharges > 0) maxCharges = cardData.maxCharges;
+		}
 		data.BoardCardIds[slotIndex] = cardId;
+		data.BoardCardCharges[slotIndex] = maxCharges;
 		playerData.Value = data;
 
 		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} played card {cardId} to slot {slotIndex}");
 
-		// notify opponent to show card back on their board (not revealed yet)
-		ulong opponentId = GetOpponentId(OwnerClientId);
-		if (opponentId != OwnerClientId) {
-			ClientRpcParams opponentParams = new ClientRpcParams {
-				Send = new ClientRpcSendParams {
-					TargetClientIds = new ulong[] { opponentId }
-				}
-			};
-			NotifyOpponentCardPlayedClientRpc(cardId, slotIndex, opponentParams);
-		}
+		// Opponent board is updated only from replicated BoardCardIds (BoardManager.SyncOpponentBoardFromServerState),
+		// so we do not send NotifyOpponentCardPlayedClientRpc here — that caused wrong counts (e.g. 1 card shown as 2, or 2 as 1).
 	}
 
 	[ClientRpc]
@@ -450,6 +534,38 @@ public class PlayerNetwork : NetworkBehaviour {
 
 	public FixedList32Bytes<int> GetBoardCards() {
 		return playerData.Value.BoardCardIds;
+	}
+
+	/// <summary>Server only. Apply damage to this player (the defender).</summary>
+	public void ApplyDamageServer(int damage) {
+		if (!IsServer) return;
+		PlayerData data = playerData.Value;
+		data.Health = Mathf.Max(0, data.Health - damage);
+		playerData.Value = data;
+		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} took {damage} damage. HP: {data.Health}");
+	}
+
+	/// <summary>Server only. Decrement attack charge in slot; returns new charge count.</summary>
+	public int DecrementBoardChargeServer(int slotIndex) {
+		if (!IsServer) return 0;
+		PlayerData data = playerData.Value;
+		while (data.BoardCardCharges.Length <= slotIndex) data.BoardCardCharges.Add(0);
+		int ch = Mathf.Max(0, data.BoardCardCharges[slotIndex] - 1);
+		data.BoardCardCharges[slotIndex] = ch;
+		playerData.Value = data;
+		return ch;
+	}
+
+	/// <summary>Server only. Remove card from board slot (clear id and charges).</summary>
+	public void RemoveBoardCardServer(int slotIndex) {
+		if (!IsServer) return;
+		PlayerData data = playerData.Value;
+		while (data.BoardCardIds.Length <= slotIndex) data.BoardCardIds.Add(-1);
+		while (data.BoardCardCharges.Length <= slotIndex) data.BoardCardCharges.Add(0);
+		data.BoardCardIds[slotIndex] = -1;
+		data.BoardCardCharges[slotIndex] = 0;
+		playerData.Value = data;
+		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} slot {slotIndex} card removed (out of charges)");
 	}
 
 	[ClientRpc]

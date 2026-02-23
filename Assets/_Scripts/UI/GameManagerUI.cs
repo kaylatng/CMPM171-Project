@@ -59,7 +59,7 @@ public class GameManagerUI : MonoBehaviour
 	
 	private void Update()
 	{
-		// find local player if we haven't yet
+		// find local player if we haven't yet, and update resource display (with pending attack deduction in Planning)
 		if (localPlayer == null && NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient) {
 			var localClient = NetworkManager.Singleton.LocalClient;
 			if (localClient != null && localClient.PlayerObject != null)
@@ -68,13 +68,13 @@ public class GameManagerUI : MonoBehaviour
 				if (localPlayer != null)
 				{
 					Debug.Log("GAME MANAGER UI || Found local player");
-					UpdateResourceUI(
-						localPlayer.GetCurrentActionPoints(),
-						localPlayer.GetCurrentMana(),
-						localPlayer.GetCurrentHealth()
-					);
+					ApplyResourceDisplay(localPlayer);
 				}
 			}
+		}
+		else if (localPlayer != null)
+		{
+			ApplyResourceDisplay(localPlayer);
 		}
 
 		// check opponent ready status
@@ -90,6 +90,10 @@ public class GameManagerUI : MonoBehaviour
 				Debug.Log("GAME MANAGER UI || Cannot ready - not in Planning phase");
 				return;
 			}
+
+			// Submit all toggled attack intents before marking ready (resources deducted on server when RPCs are processed)
+			if (BoardManager.Instance != null)
+				BoardManager.Instance.SubmitLocalAttackIntents();
 
 			localPlayer.FinishTurn();
 			UpdateReadyButton(true);
@@ -213,6 +217,30 @@ public class GameManagerUI : MonoBehaviour
 		}
 	}
 
+	/// <summary>Apply resource display: in Planning phase, subtract pending attack count from AP/Mana for real-time feedback.</summary>
+	private void ApplyResourceDisplay(PlayerNetwork player)
+	{
+		int ap = player.GetCurrentActionPoints();
+		int mana = player.GetCurrentMana();
+		int health = player.GetCurrentHealth();
+		int pending = GetPendingAttackDeduction();
+		UpdateResourceUI(ap - pending, mana - pending, health);
+	}
+
+	/// <summary>Called when server pushes new player data; applies pending attack deduction so display matches intent.</summary>
+	public void OnServerResourceUpdate(int ap, int mana, int health)
+	{
+		int pending = GetPendingAttackDeduction();
+		UpdateResourceUI(ap - pending, mana - pending, health);
+	}
+
+	private int GetPendingAttackDeduction()
+	{
+		if (GameManager.Instance == null || !GameManager.Instance.CanPlayCards() || BoardManager.Instance == null)
+			return 0;
+		return BoardManager.Instance.GetLocalPendingAttackCount();
+	}
+
 	public void UpdateResourceUI(int ap, int mana, int health)
 	{
 		if (apText != null)
@@ -251,6 +279,16 @@ public class GameManagerUI : MonoBehaviour
 			{
 				healthText.color = Color.white;
 			}
+		}
+
+		if (hpText != null) {
+			hpText.text = $"HP: {health}/20";
+			if (health <= 5)
+				hpText.color = Color.red;
+			else if (health <= 10)
+				hpText.color = Color.yellow;
+			else
+				hpText.color = Color.white;
 		}
 	}
 

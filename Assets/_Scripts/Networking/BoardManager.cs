@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.Netcode;
+using Unity.Collections;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,6 +22,8 @@ public class BoardManager : MonoBehaviour
     [SerializeField] private float cardSpacing = 2.0f;
     [SerializeField] private float cardMoveSpeed = 12f;
     [SerializeField] private AnimationCurve layoutCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+    [Tooltip("Fixed X positions for the 3 slots (left, center, right). Cards stay in the slot they are placed in.")]
+    [SerializeField] private float[] slotPositionsX = new float[] { -2f, 0f, 2f };
 
     [Header("Reveal Phase")]
     [SerializeField] private float revealFlipDuration = 0.25f;
@@ -51,6 +54,25 @@ public class BoardManager : MonoBehaviour
     private List<BoardSlot> playerSlots = new List<BoardSlot>();
     private List<BoardSlot> opponentSlots = new List<BoardSlot>();
 
+    // Attack phase: queue of attack data; played one by one with opponent attacks first
+    private List<AttackResultData> pendingAttackResults = new List<AttackResultData>();
+
+    // Opponent board sync from authoritative server state (so multiple cards / pairs show correctly)
+    private PlayerNetwork cachedOpponentPlayer;
+    private bool opponentBoardSyncSubscribed;
+
+    // Opponent cards that were on board at end of last reveal (by slot index). New cards played this round stay face-down until next reveal.
+    private List<int> revealedOpponentCardIdsBySlot = new List<int>();
+
+    public struct AttackResultData
+    {
+        public ulong attackerClientId;
+        public int slotIndex;
+        public int damageDealt;
+        public int chargesRemaining;
+        public bool removeCard;
+    }
+
     private void Awake()
     {
         if (Instance == null)
@@ -60,6 +82,16 @@ public class BoardManager : MonoBehaviour
         else
         {
             Destroy(gameObject);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (cachedOpponentPlayer != null && opponentBoardSyncSubscribed)
+        {
+            cachedOpponentPlayer.UnsubscribeFromDataChanged(OnOpponentPlayerDataChanged);
+            opponentBoardSyncSubscribed = false;
+            cachedOpponentPlayer = null;
         }
     }
 
@@ -76,6 +108,132 @@ public class BoardManager : MonoBehaviour
         
         // Update slot blinking based on card selection/dragging
         UpdateSlotBlinking();
+
+        // Subscribe to opponent's board state once we have 2 clients (so opponent board stays in sync with server)
+        EnsureOpponentBoardSyncSubscribed();
+    }
+
+    private void EnsureOpponentBoardSyncSubscribed()
+    {
+        if (opponentBoardSyncSubscribed || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsClient)
+            return;
+        if (NetworkManager.Singleton.ConnectedClientsList.Count < 2)
+            return;
+
+        ulong localId = NetworkManager.Singleton.LocalClientId;
+        foreach (var kvp in NetworkManager.Singleton.ConnectedClients)
+        {
+            if (kvp.Key == localId) continue;
+            var client = kvp.Value;
+            if (client?.PlayerObject == null) continue;
+            var otherPlayer = client.PlayerObject.GetComponent<PlayerNetwork>();
+            if (otherPlayer == null) continue;
+
+            cachedOpponentPlayer = otherPlayer;
+            cachedOpponentPlayer.SubscribeToDataChanged(OnOpponentPlayerDataChanged);
+            opponentBoardSyncSubscribed = true;
+            // Initial sync so board matches server state (e.g. after reconnect or late join)
+            SyncOpponentBoardFromServerState(cachedOpponentPlayer.GetBoardCards());
+            Debug.Log($"BOARD MANAGER || Subscribed to opponent board sync (client {kvp.Key})");
+            break;
+        }
+    }
+
+    private void OnOpponentPlayerDataChanged(PlayerNetwork.PlayerData previous, PlayerNetwork.PlayerData next)
+    {
+        SyncOpponentBoardFromServerState(next.BoardCardIds);
+    }
+
+    /// <summary>Place a card on the opponent board from server state sync (does not remove from opponent hand).</summary>
+    private void PlaceOpponentCardFromSync(int cardId, int index)
+    {
+        if (CardManager.Instance == null) return;
+        GameObject card = Instantiate(CardManager.Instance.GetCardPrefab());
+        if (card == null) return;
+        // Face-up only if this slot had this same card at end of last reveal (already revealed). New cards stay face-down until next reveal.
+        bool alreadyRevealed = index < revealedOpponentCardIdsBySlot.Count && revealedOpponentCardIdsBySlot[index] == cardId;
+        CardManager.Instance.InitializeCardVisual(card, cardId, alreadyRevealed);
+        CardDraggable draggable = card.GetComponent<CardDraggable>();
+        if (draggable != null) { draggable.enabled = false; draggable.SetOnBoard(true); }
+        CardShadow shadow = card.GetComponent<CardShadow>();
+        if (shadow == null) card.AddComponent<CardShadow>();
+        TryPlaceCard(card, false, index);
+    }
+
+    /// <summary>Sync opponent board from authoritative server state. Only replace cards that don't match so existing cards don't rerender/snap.</summary>
+    private void SyncOpponentBoardFromServerState(FixedList32Bytes<int> boardCardIds)
+    {
+        if (boardCardIds.Length == 0)
+        {
+            ClearOpponentBoardCardsOnly();
+            return;
+        }
+
+        // Check if current opponent board already matches (avoid any change)
+        if (opponentBoardCards.Count == boardCardIds.Length)
+        {
+            bool match = true;
+            for (int i = 0; i < opponentBoardCards.Count && i < boardCardIds.Length; i++)
+            {
+                var visual = opponentBoardCards[i].GetComponent<CardVisual>();
+                if (visual == null || visual.CardID != boardCardIds[i]) { match = false; break; }
+            }
+            if (match)
+            {
+                ArrangeCardsOnBoard(false);
+                return;
+            }
+        }
+
+        // Incremental update: only remove/replace cards that don't match; keep matching cards so they don't rerender
+        for (int i = 0; i < boardCardIds.Length; i++)
+        {
+            int needCardId = boardCardIds[i];
+            if (needCardId < 0) continue;
+
+            bool replacedSlot = false;
+            if (i < opponentBoardCards.Count)
+            {
+                var visual = opponentBoardCards[i].GetComponent<CardVisual>();
+                if (visual != null && visual.CardID == needCardId)
+                    continue; // same card at same slot, keep it
+                RemoveOneOpponentCardAt(i);
+                replacedSlot = true; // card was swapped back to hand on server, so hand count unchanged
+            }
+            PlaceOpponentCardFromSync(needCardId, i);
+            // New card from opponent hand (empty slot): remove one card from opponent hand on our view
+            if (!replacedSlot && CardManager.Instance != null)
+                CardManager.Instance.RemoveOneOpponentHandCard();
+        }
+
+        // Remove excess cards (server has fewer than we do)
+        while (opponentBoardCards.Count > boardCardIds.Length)
+            RemoveOneOpponentCardAt(opponentBoardCards.Count - 1);
+    }
+
+    /// <summary>Remove and destroy one opponent board card at the given index. Used for incremental sync.</summary>
+    private void RemoveOneOpponentCardAt(int index)
+    {
+        if (index < 0 || index >= opponentBoardCards.Count) return;
+        GameObject card = opponentBoardCards[index];
+        opponentBoardCards.RemoveAt(index);
+        cardBoardIndices.Remove(card);
+        cardTargetPositions.Remove(card);
+        if (card != null) Destroy(card);
+        ArrangeCardsOnBoard(false);
+    }
+
+    private void ClearOpponentBoardCardsOnly()
+    {
+        List<GameObject> copy = new List<GameObject>(opponentBoardCards);
+        foreach (GameObject card in copy)
+        {
+            opponentBoardCards.Remove(card);
+            cardBoardIndices.Remove(card);
+            cardTargetPositions.Remove(card);
+            if (card != null) Destroy(card);
+        }
+        ArrangeCardsOnBoard(false);
     }
     
     private void UpdateSlotBlinking()
@@ -328,6 +486,10 @@ public class BoardManager : MonoBehaviour
         // Arrange all cards
         ArrangeCardsOnBoard(isPlayerCard);
 
+        // Place new cards at target position immediately so they don't lerp from center
+        if (cardTargetPositions.TryGetValue(card, out Vector3 targetPos))
+            card.transform.localPosition = targetPos;
+
         Debug.Log($"BOARD MANAGER || Placed card on {(isPlayerCard ? "player" : "opponent")} board ({targetBoard.Count}/{maxCardsPerBoard})");
 
         // CHECK FOR MERGES after placing the card (player only; opponent merges only in reveal phase)
@@ -509,19 +671,127 @@ public class BoardManager : MonoBehaviour
         CheckAndMergeCards(isPlayerBoard);
     }
 
+    /// <summary>Number of local player board cards currently with attack intent (tilt). Used for UI resource preview.</summary>
+    public int GetLocalPendingAttackCount()
+    {
+        var seen = new HashSet<GameObject>();
+        int count = 0;
+        foreach (BoardSlot slot in playerSlots)
+        {
+            if (slot?.OccupyingCard == null) continue;
+            if (!seen.Add(slot.OccupyingCard)) continue;
+            var d = slot.OccupyingCard.GetComponent<CardDraggable>();
+            if (d != null && d.IsAttacking) count++;
+        }
+        foreach (GameObject go in playerBoardCards)
+        {
+            if (go == null || !seen.Add(go)) continue;
+            var d = go.GetComponent<CardDraggable>();
+            if (d != null && d.IsAttacking) count++;
+        }
+        return count;
+    }
+
+    /// <summary>Submit all local attack intents to the server (call when player clicks Ready). Clears local isAttacking after each submit.</summary>
+    public void SubmitLocalAttackIntents()
+    {
+        var seen = new HashSet<GameObject>();
+        foreach (BoardSlot slot in playerSlots)
+        {
+            if (slot?.OccupyingCard == null) continue;
+            if (!seen.Add(slot.OccupyingCard)) continue;
+            var d = slot.OccupyingCard.GetComponent<CardDraggable>();
+            if (d != null && d.IsAttacking)
+                d.SubmitAttackIntent();
+        }
+        foreach (GameObject go in playerBoardCards)
+        {
+            if (go == null || !seen.Add(go)) continue;
+            var d = go.GetComponent<CardDraggable>();
+            if (d != null && d.IsAttacking)
+                d.SubmitAttackIntent();
+        }
+    }
+
     /// <summary>
-    /// Called at start of reveal phase: flip opponent cards one by one, then run merge if possible.
+    /// Clear attack tilt on all player board cards. Call at start of reveal so cards are straight before animations.
+    /// </summary>
+    public void ClearAllAttackTilts()
+    {
+        // Player slots
+        foreach (BoardSlot slot in playerSlots)
+        {
+            if (slot == null || slot.OccupyingCard == null) continue;
+            CardVisual cv = slot.OccupyingCard.GetComponent<CardVisual>();
+            if (cv != null)
+                cv.SetScheduledToAttack(false);
+            var d = slot.OccupyingCard.GetComponent<CardDraggable>();
+            if (d != null)
+                d.ClearAttackIntent();
+        }
+        // Player zone-placed cards
+        foreach (GameObject card in playerBoardCards)
+        {
+            if (card == null) continue;
+            CardVisual cv = card.GetComponent<CardVisual>();
+            if (cv != null)
+                cv.SetScheduledToAttack(false);
+            var d = card.GetComponent<CardDraggable>();
+            if (d != null)
+                d.ClearAttackIntent();
+        }
+    }
+
+    /// <summary>
+    /// Called at start of reveal phase: clear tilts, then flip opponent cards, then merge, then (later) attack animations.
     /// </summary>
     public void StartRevealSequence()
     {
+        ClearAllAttackTilts();
         StartCoroutine(RevealOpponentCardsThenMerge());
     }
 
     private IEnumerator RevealOpponentCardsThenMerge()
     {
-        // Reveal opponent cards one by one
-        List<GameObject> cardsToReveal = new List<GameObject>(opponentBoardCards);
-        foreach (GameObject card in cardsToReveal)
+        // Clear so we rebuild for this round; will capture at end of reveal
+        revealedOpponentCardIdsBySlot.Clear();
+
+        // Collect face-down cards per board, then flip opponent first (left-to-right), then player (left-to-right)
+        List<GameObject> opponentFaceDown = new List<GameObject>();
+        List<GameObject> playerFaceDown = new List<GameObject>();
+        foreach (GameObject card in opponentBoardCards)
+        {
+            if (card == null) continue;
+            CardVisual v = card.GetComponent<CardVisual>();
+            if (v != null && v.IsFaceDown) opponentFaceDown.Add(card);
+        }
+        foreach (GameObject card in playerBoardCards)
+        {
+            if (card == null) continue;
+            CardVisual v = card.GetComponent<CardVisual>();
+            if (v != null && v.IsFaceDown) playerFaceDown.Add(card);
+        }
+        int SlotOrder(GameObject a, GameObject b)
+        {
+            int idxA = cardBoardIndices.TryGetValue(a, out int iA) ? iA : 0;
+            int idxB = cardBoardIndices.TryGetValue(b, out int iB) ? iB : 0;
+            return idxA.CompareTo(idxB);
+        }
+        opponentFaceDown.Sort(SlotOrder);
+        playerFaceDown.Sort(SlotOrder);
+
+        // Flip one by one: opponent cards first (left to right), then player cards (same order on host and client)
+        foreach (GameObject card in opponentFaceDown)
+        {
+            if (card == null) continue;
+            CardVisual visual = card.GetComponent<CardVisual>();
+            if (visual != null && visual.IsFaceDown)
+            {
+                yield return StartCoroutine(visual.FlipToReveal(revealFlipDuration));
+                yield return new WaitForSeconds(delayBetweenReveals);
+            }
+        }
+        foreach (GameObject card in playerFaceDown)
         {
             if (card == null) continue;
             CardVisual visual = card.GetComponent<CardVisual>();
@@ -535,6 +805,16 @@ public class BoardManager : MonoBehaviour
         // After all revealed, check for merges and play merge animation
         yield return new WaitForSeconds(0.15f);
         CheckAndMergeCards(false);
+
+        // Capture opponent board state so only these cards stay face-up next round; new cards stay face-down until next reveal
+        revealedOpponentCardIdsBySlot.Clear();
+        for (int i = 0; i < opponentBoardCards.Count; i++)
+        {
+            if (opponentBoardCards[i] == null) continue;
+            var v = opponentBoardCards[i].GetComponent<CardVisual>();
+            if (v != null)
+                revealedOpponentCardIdsBySlot.Add(v.CardID);
+        }
     }
 
     private void ArrangeCardsOnBoard(bool isPlayerBoard)
@@ -547,18 +827,23 @@ public class BoardManager : MonoBehaviour
             return;
         }
 
-        // Calculate positions
-        float totalWidth = (cards.Count - 1) * cardSpacing;
-        float startX = -totalWidth / 2f;
-
+        // Fixed slot positions for 3 slots: index 0 = left, 1 = center, 2 = right. No centering.
+        float verticalOffset = isPlayerBoard ? -1.2f : 0f;
         for (int i = 0; i < cards.Count; i++)
         {
             GameObject card = cards[i];
             if (card == null) continue;
 
-            // Set target position
-            float verticalOffset = isPlayerBoard ? -1.2f : 0;
-            Vector3 targetPos = new Vector3(startX + (i * cardSpacing), verticalOffset, 0);
+            // Skip cards that are in a BoardSlot—they are locked to the slot's position
+            CardDraggable draggable = card.GetComponent<CardDraggable>();
+            if (draggable != null && draggable.CurrentSlot != null)
+            {
+                cardBoardIndices[card] = i;
+                continue;
+            }
+
+            float x = (slotPositionsX != null && i < slotPositionsX.Length) ? slotPositionsX[i] : (i == 0 ? -cardSpacing : (i == 1 ? 0f : cardSpacing));
+            Vector3 targetPos = new Vector3(x, verticalOffset, 0f);
             cardTargetPositions[card] = targetPos;
             cardBoardIndices[card] = i;
 
@@ -577,7 +862,7 @@ public class BoardManager : MonoBehaviour
 
     private void UpdateCardPositions()
     {
-        // Smoothly lerp cards to their target positions
+        // Smoothly lerp cards to their target positions (only cards in zone path; slot cards are locked to their slot)
         foreach (var kvp in cardTargetPositions)
         {
             GameObject card = kvp.Key;
@@ -585,14 +870,12 @@ public class BoardManager : MonoBehaviour
 
             if (card != null)
             {
-                // Check if card is being dragged
                 CardDraggable draggable = card.GetComponent<CardDraggable>();
                 if (draggable != null && draggable.IsDragging)
-                {
                     continue; // Don't update position while dragging
-                }
+                if (draggable != null && draggable.CurrentSlot != null)
+                    continue; // Card is in a slot—slot controls position, don't move it here
 
-                // Smooth movement
                 card.transform.localPosition = Vector3.Lerp(
                     card.transform.localPosition,
                     targetPos,
@@ -660,6 +943,155 @@ public class BoardManager : MonoBehaviour
     public List<GameObject> GetBoardCards(bool isPlayerBoard)
     {
         return isPlayerBoard ? new List<GameObject>(playerBoardCards) : new List<GameObject>(opponentBoardCards);
+    }
+
+    /// <summary>Get the card in a specific slot (slot-based board). Returns null if slot empty or not found.</summary>
+    public GameObject GetCardInSlot(int slotIndex, bool isPlayerBoard)
+    {
+        List<BoardSlot> slots = isPlayerBoard ? playerSlots : opponentSlots;
+        foreach (BoardSlot slot in slots)
+        {
+            if (slot != null && slot.SlotIndex == slotIndex)
+                return slot.OccupyingCard;
+        }
+        return null;
+    }
+
+    /// <summary>Get board index (0,1,2) for a card placed via zone path. Returns -1 if not on board.</summary>
+    public int GetCardBoardIndex(GameObject card, bool isPlayerBoard)
+    {
+        if (card == null) return -1;
+        if (cardBoardIndices.TryGetValue(card, out int idx))
+            return idx;
+        List<GameObject> board = isPlayerBoard ? playerBoardCards : opponentBoardCards;
+        int i = board.IndexOf(card);
+        return i >= 0 ? i : -1;
+    }
+
+    /// <summary>Get card at board index (zone or slot path). Tries slot first, then zone list.</summary>
+    public GameObject GetCardAtBoardIndex(int slotIndex, bool isPlayerBoard)
+    {
+        GameObject fromSlot = GetCardInSlot(slotIndex, isPlayerBoard);
+        if (fromSlot != null) return fromSlot;
+        List<GameObject> board = isPlayerBoard ? playerBoardCards : opponentBoardCards;
+        if (slotIndex >= 0 && slotIndex < board.Count)
+            return board[slotIndex];
+        return null;
+    }
+
+    /// <summary>Called when a player schedules an attack in planning. Shows tilt only on the local player's cards; opponent's attack plan is hidden.</summary>
+    public void OnAttackScheduled(ulong attackerClientId, int slotIndex)
+    {
+        bool isAttackerLocal = Unity.Netcode.NetworkManager.Singleton != null &&
+            Unity.Netcode.NetworkManager.Singleton.LocalClientId == attackerClientId;
+        if (!isAttackerLocal)
+            return; // Opponent's cards do not tilt; hide their attack plan
+        GameObject card = GetCardAtBoardIndex(slotIndex, true);
+        if (card != null)
+        {
+            CardVisual cv = card.GetComponent<CardVisual>();
+            if (cv != null)
+                cv.SetScheduledToAttack(true);
+        }
+    }
+
+    /// <summary>Queue one attack result (called from client RPC). Play with PlayAttacksSequence so opponent attacks first, one by one.</summary>
+    public void ReceiveAttackData(ulong attackerClientId, int slotIndex, int damageDealt, int chargesRemaining, bool removeCard)
+    {
+        pendingAttackResults.Add(new AttackResultData
+        {
+            attackerClientId = attackerClientId,
+            slotIndex = slotIndex,
+            damageDealt = damageDealt,
+            chargesRemaining = chargesRemaining,
+            removeCard = removeCard
+        });
+    }
+
+    /// <summary>Play all queued attacks one by one: opponent's attacks first, then local player's. Call after all ReceiveAttackData.</summary>
+    public void PlayAttacksSequence()
+    {
+        StartCoroutine(PlayAttacksSequenceCoroutine());
+    }
+
+    private IEnumerator PlayAttacksSequenceCoroutine()
+    {
+        ulong localId = Unity.Netcode.NetworkManager.Singleton != null ? Unity.Netcode.NetworkManager.Singleton.LocalClientId : 0;
+        // Opponent attacks first (attacker != local), then local player's attacks
+        pendingAttackResults.Sort((a, b) =>
+        {
+            bool aOpponent = a.attackerClientId != localId;
+            bool bOpponent = b.attackerClientId != localId;
+            if (aOpponent && !bOpponent) return -1;
+            if (!aOpponent && bOpponent) return 1;
+            return 0;
+        });
+        foreach (var data in pendingAttackResults)
+        {
+            yield return StartCoroutine(PlaySingleAttackResultCoroutine(data.attackerClientId, data.slotIndex, data.damageDealt, data.chargesRemaining, data.removeCard));
+        }
+        pendingAttackResults.Clear();
+    }
+
+    /// <summary>Play one attack result in reveal phase: animate card hitting opponent then return, consume charge, remove if 0.</summary>
+    public void PlaySingleAttackResult(ulong attackerClientId, int slotIndex, int damageDealt, int chargesRemaining, bool removeCard)
+    {
+        StartCoroutine(PlaySingleAttackResultCoroutine(attackerClientId, slotIndex, damageDealt, chargesRemaining, removeCard));
+    }
+
+    [Header("Attack Animation")]
+    [SerializeField] private float attackFlyDuration = 0.35f;
+    [SerializeField] private float attackReturnDuration = 0.25f;
+
+    private IEnumerator PlaySingleAttackResultCoroutine(ulong attackerClientId, int slotIndex, int damageDealt, int chargesRemaining, bool removeCard)
+    {
+        bool isAttackerLocal = Unity.Netcode.NetworkManager.Singleton != null &&
+            Unity.Netcode.NetworkManager.Singleton.LocalClientId == attackerClientId;
+        GameObject card = GetCardAtBoardIndex(slotIndex, isAttackerLocal);
+        if (card == null)
+            yield break;
+
+        Vector3 startPos = card.transform.position;
+        Vector3 targetPos = isAttackerLocal && opponentBoardZone != null
+            ? opponentBoardZone.position
+            : (playerBoardZone != null ? playerBoardZone.position : startPos + new Vector3(0, 2f, 0));
+
+        float elapsed = 0f;
+        while (elapsed < attackFlyDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / attackFlyDuration;
+            card.transform.position = Vector3.Lerp(startPos, targetPos, t);
+            yield return null;
+        }
+        card.transform.position = targetPos;
+
+        elapsed = 0f;
+        while (elapsed < attackReturnDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / attackReturnDuration;
+            card.transform.position = Vector3.Lerp(targetPos, startPos, t);
+            yield return null;
+        }
+        card.transform.position = startPos;
+
+        CardVisual cv = card.GetComponent<CardVisual>();
+        if (cv != null)
+        {
+            cv.SetScheduledToAttack(false);
+            cv.SetCharges(chargesRemaining);
+        }
+
+        if (removeCard && card != null)
+        {
+            BoardSlot slot = card.GetComponent<CardDraggable>()?.CurrentSlot;
+            if (slot != null)
+                slot.RemoveCard(notifyManager: true);
+            else
+                RemoveCardFromBoard(card, isAttackerLocal, notifyServer: false);
+            Destroy(card);
+        }
     }
 
     public void ClearBoard(bool isPlayerBoard)
@@ -776,11 +1208,12 @@ public class BoardManager : MonoBehaviour
         // Remove one card from opponent hand
         CardManager.Instance.RemoveOneOpponentHandCard();
 
-        // Create the card face-down (revealed in reveal phase)
+        // Face-up only if this slot had this same card at end of last reveal (already revealed). New cards stay face-down until next reveal.
+        bool alreadyRevealed = index < revealedOpponentCardIdsBySlot.Count && revealedOpponentCardIdsBySlot[index] == cardId;
         GameObject card = Instantiate(CardManager.Instance.GetCardPrefab());
         if (card != null)
         {
-            CardManager.Instance.InitializeCardVisual(card, cardId, false);
+            CardManager.Instance.InitializeCardVisual(card, cardId, alreadyRevealed);
             
             CardDraggable draggable = card.GetComponent<CardDraggable>();
             if (draggable != null)
