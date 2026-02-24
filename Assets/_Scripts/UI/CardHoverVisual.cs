@@ -100,6 +100,14 @@ public class CardHover25DVisual : MonoBehaviour
             && (draggable == null || !draggable.IsDragging)
             && (!onlyWhenOnBoard || draggable == null || draggable.IsOnBoard);
 
+        // When we're not actively hovering this frame, treat the current
+        // local position as the new baseline so external layout (e.g.,
+        // BoardSlot / BoardManager) can fully control where the card lives.
+        if (!active)
+        {
+            pos0 = cardRoot.localPosition;
+        }
+
         Vector2 p = (p01 * 2f) - Vector2.one;
 
         float tScale = active ? hoverScale : 1f;
