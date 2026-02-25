@@ -18,6 +18,10 @@ public class NetworkManagerUI : MonoBehaviour
 	[Tooltip("Assign a TextMeshProUGUI to show the host's public IP after clicking Host.")]
 	[SerializeField] private TextMeshProUGUI hostPublicIpText;
 
+	[Header("Connection Status (optional)")]
+	[Tooltip("Optional status label to show host/client connection state (e.g. 'Waiting for opponent...').")]
+	[SerializeField] private TextMeshProUGUI statusText;
+
 	[Header("Direct IP (optional - for Client)")]
 	[Tooltip("Leave empty to use 127.0.0.1 (same machine). Set to host's IP for LAN/internet.")]
 	[SerializeField] private InputField ipAddressInputField;
@@ -33,18 +37,46 @@ public class NetworkManagerUI : MonoBehaviour
 		clientBtn.onClick.AddListener(OnClientClicked);
 		if (hostPublicIpText != null)
 			hostPublicIpText.gameObject.SetActive(false);
+
+		if (statusText != null)
+			statusText.text = "";
+
+		if (NetworkManager.Singleton != null)
+		{
+			NetworkManager.Singleton.OnClientConnectedCallback += HandleClientConnected;
+			NetworkManager.Singleton.OnClientDisconnectCallback += HandleClientDisconnected;
+		}
+	}
+
+	private void OnDestroy()
+	{
+		if (NetworkManager.Singleton != null)
+		{
+			NetworkManager.Singleton.OnClientConnectedCallback -= HandleClientConnected;
+			NetworkManager.Singleton.OnClientDisconnectCallback -= HandleClientDisconnected;
+		}
 	}
 
 	private void OnServerClicked()
 	{
 		HideHostIp();
+		ConfigureServerTransport();
 		NetworkManager.Singleton.StartServer();
+		SetStatus("Server running. Waiting for clients...");
 	}
 
 	private void OnHostClicked()
 	{
-		NetworkManager.Singleton.StartHost();
+		ConfigureServerTransport();
+		bool success = NetworkManager.Singleton.StartHost();
+		if (!success)
+		{
+			SetStatus("Failed to start host.");
+			return;
+		}
+
 		ShowAndFetchHostIp();
+		SetStatus("Hosting game. Waiting for opponent to join...");
 	}
 
 	private void HideHostIp()
@@ -84,7 +116,17 @@ public class NetworkManagerUI : MonoBehaviour
 		if (transport != null)
 			transport.SetConnectionData(ip, port);
 
-		NetworkManager.Singleton.StartClient();
+		SetStatus($"Connecting to {ip}:{port}...");
+
+		bool success = NetworkManager.Singleton.StartClient();
+		if (!success)
+		{
+			SetStatus("Failed to start client.");
+		}
+		else
+		{
+			// client started; connection result will be reflected via callbacks
+		}
 	}
 
 	private string GetClientAddress()
@@ -99,5 +141,65 @@ public class NetworkManagerUI : MonoBehaviour
 		if (portInputField == null || string.IsNullOrWhiteSpace(portInputField.text))
 			return DefaultPort;
 		return ushort.TryParse(portInputField.text.Trim(), out ushort p) ? p : DefaultPort;
+	}
+
+	/// <summary>
+	/// Configure the Unity Transport for server/host to listen on all interfaces using the chosen port.
+	/// </summary>
+	private void ConfigureServerTransport()
+	{
+		var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+		if (transport == null) return;
+
+		// Use the same port field as the client, or default if none provided.
+		ushort port = GetClientPort();
+		// Listen on all interfaces (0.0.0.0) so external clients can reach us when port-forwarded.
+		transport.SetConnectionData("0.0.0.0", port);
+	}
+
+	private void HandleClientConnected(ulong clientId)
+	{
+		if (statusText == null || NetworkManager.Singleton == null) return;
+
+		// Host: update when any client connects (including our own local client on host),
+		// so the "waiting for opponent" text is not left stale.
+		if (NetworkManager.Singleton.IsHost)
+		{
+			if (clientId == NetworkManager.Singleton.LocalClientId)
+			{
+				SetStatus("Hosting game (local client connected). Waiting for opponent...");
+			}
+			else
+			{
+				SetStatus("Opponent connected. Starting game!");
+			}
+		}
+		// Pure client (non-host): we successfully connected to the host.
+		else if (!NetworkManager.Singleton.IsServer && clientId == NetworkManager.Singleton.LocalClientId)
+		{
+			SetStatus("Connected to host.");
+		}
+	}
+
+	private void HandleClientDisconnected(ulong clientId)
+	{
+		if (statusText == null || NetworkManager.Singleton == null) return;
+
+		// Client lost connection to host.
+		if (!NetworkManager.Singleton.IsServer && clientId == NetworkManager.Singleton.LocalClientId)
+		{
+			SetStatus("Disconnected from host.");
+		}
+		// Host lost the connected opponent.
+		else if (NetworkManager.Singleton.IsHost && clientId != NetworkManager.Singleton.LocalClientId)
+		{
+			SetStatus("Opponent disconnected.");
+		}
+	}
+
+	private void SetStatus(string message)
+	{
+		if (statusText == null) return;
+		statusText.text = message;
 	}
 }
