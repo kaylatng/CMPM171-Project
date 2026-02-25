@@ -494,7 +494,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 71, y: 36}
+  m_AnchoredPosition: {x: 14, y: 40}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &408091831
@@ -709,8 +709,8 @@ MonoBehaviour:
   serverBtn: {fileID: 1177400708}
   hostBtn: {fileID: 1155190365}
   clientBtn: {fileID: 1953952573}
-  hostPublicIpText: {fileID: 0}
-  ipAddressInputField: {fileID: 0}
+  hostPublicIpText: {fileID: 408091831}
+  ipAddressInputField: {fileID: 1600494701}
   portInputField: {fileID: 0}
 --- !u!1 &476666046
 GameObject:
