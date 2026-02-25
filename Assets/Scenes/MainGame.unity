@@ -575,7 +575,7 @@ MonoBehaviour:
   hostBtn: {fileID: 1155190365}
   clientBtn: {fileID: 1953952573}
   hostPublicIpText: {fileID: 1407222038}
-  statusText: {fileID: 0}
+  statusText: {fileID: 1744318535}
   ipAddressInputField: {fileID: 1600494701}
   portInputField: {fileID: 0}
 --- !u!1 &476666046
