@@ -1,0 +1,2 @@
+{"sessionId":"ccbeaf","runId":"initial","hypothesisId":"H2","location":"NetworkManagerUI.OnHostClicked.before","message":"Attempting to start host","data":{"ip":"0.0.0.0","port":7778},"timestamp":1772005791471}
+{"sessionId":"ccbeaf","runId":"initial","hypothesisId":"H2","location":"NetworkManagerUI.OnHostClicked.after","message":"Host started successfully","data":{"isHost":true},"timestamp":1772005791751}
