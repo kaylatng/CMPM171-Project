@@ -51,6 +51,7 @@
     <Compile Include="Assets\_Scripts\UI\CardShadow.cs" />
     <Compile Include="Assets\_Scripts\Networking\PlayerNetwork.cs" />
     <Compile Include="Assets\_Scripts\Data\CardData.cs" />
+    <Compile Include="Assets\_Scripts\UI\PlayerResourcesUI.cs" />
     <Compile Include="Assets\_Scripts\Data\BoardSlot.cs" />
     <Compile Include="Assets\_Scripts\Networking\DeckClickable.cs" />
     <Compile Include="Assets\_Scripts\UI\CardHover.cs" />
