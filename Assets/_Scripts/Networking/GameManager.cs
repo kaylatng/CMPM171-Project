@@ -74,7 +74,7 @@ public class GameManager : NetworkBehaviour
 	private System.Collections.IEnumerator ProcessResourceGain()
 	{
 		Debug.Log("GAME MANAGER || === RESOURCE GAIN PHASE ===");
-		
+
 		// wait for both players to connect
 		while (NetworkManager.Singleton.ConnectedClientsList.Count < 2)
 		{

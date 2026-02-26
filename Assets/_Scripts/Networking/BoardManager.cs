@@ -141,7 +141,26 @@ public class BoardManager : MonoBehaviour
 
     private void OnOpponentPlayerDataChanged(PlayerNetwork.PlayerData previous, PlayerNetwork.PlayerData next)
     {
-        SyncOpponentBoardFromServerState(next.BoardCardIds);
+        // Only resync opponent board when the authoritative board card IDs actually change.
+        // Resource gain and other phase transitions modify HP/Mana/AP but leave BoardCardIds untouched;
+        // re-syncing in those cases was causing extra visual copies of cards after merges.
+        bool boardChanged = previous.BoardCardIds.Length != next.BoardCardIds.Length;
+        if (!boardChanged)
+        {
+            for (int i = 0; i < previous.BoardCardIds.Length; i++)
+            {
+                if (previous.BoardCardIds[i] != next.BoardCardIds[i])
+                {
+                    boardChanged = true;
+                    break;
+                }
+            }
+        }
+
+        if (boardChanged)
+        {
+            SyncOpponentBoardFromServerState(next.BoardCardIds);
+        }
     }
 
     /// <summary>Place a card on the opponent board from server state sync (does not remove from opponent hand).</summary>
@@ -189,7 +208,24 @@ public class BoardManager : MonoBehaviour
         for (int i = 0; i < boardCardIds.Length; i++)
         {
             int needCardId = boardCardIds[i];
-            if (needCardId < 0) continue;
+            bool hasExistingCard = i < opponentBoardCards.Count;
+            int existingId = -1;
+            if (hasExistingCard)
+            {
+                var existingVisual = opponentBoardCards[i].GetComponent<CardVisual>();
+                if (existingVisual != null)
+                    existingId = existingVisual.CardID;
+            }
+
+            if (needCardId < 0)
+            {
+                // Server says slot is empty; if we still have a card here, remove it
+                if (hasExistingCard)
+                {
+                    RemoveOneOpponentCardAt(i);
+                }
+                continue;
+            }
 
             bool replacedSlot = false;
             if (i < opponentBoardCards.Count)
@@ -203,12 +239,17 @@ public class BoardManager : MonoBehaviour
             PlaceOpponentCardFromSync(needCardId, i);
             // New card from opponent hand (empty slot): remove one card from opponent hand on our view
             if (!replacedSlot && CardManager.Instance != null)
+            {
                 CardManager.Instance.RemoveOneOpponentHandCard();
+            }
         }
 
-        // Remove excess cards (server has fewer than we do)
+        // Remove excess cards (server has fewer slots than we do overall)
         while (opponentBoardCards.Count > boardCardIds.Length)
-            RemoveOneOpponentCardAt(opponentBoardCards.Count - 1);
+        {
+            int removeIndex = opponentBoardCards.Count - 1;
+            RemoveOneOpponentCardAt(removeIndex);
+        }
     }
 
     /// <summary>Remove and destroy one opponent board card at the given index. Used for incremental sync.</summary>
