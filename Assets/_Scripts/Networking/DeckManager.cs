@@ -47,6 +47,14 @@ public class DeckManager : MonoBehaviour
         }
     }
 
+    /// <summary>Resets the deck to full 60 cards and shuffles. Call on server when resetting the game.</summary>
+    public void ResetDeck()
+    {
+        GenerateInitialDeck();
+        Shuffle();
+        Debug.Log("DECK MANAGER || Deck reset and shuffled");
+    }
+
     public int DrawCard()
     {
         if (masterDeck.Count == 0) return -1;

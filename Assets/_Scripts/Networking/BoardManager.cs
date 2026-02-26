@@ -1101,6 +1101,34 @@ public class BoardManager : MonoBehaviour
         Debug.Log($"BOARD MANAGER || Cleared {(isPlayerBoard ? "player" : "opponent")} board");
     }
 
+    /// <summary>Clears both boards and all slot references. Call on all clients when game is reset.</summary>
+    public void ClearAllBoardsForReset()
+    {
+        foreach (GameObject card in playerBoardCards)
+        {
+            if (card != null) Destroy(card);
+        }
+        foreach (GameObject card in opponentBoardCards)
+        {
+            if (card != null) Destroy(card);
+        }
+        playerBoardCards.Clear();
+        opponentBoardCards.Clear();
+        cardTargetPositions.Clear();
+        cardBoardIndices.Clear();
+        revealedOpponentCardIdsBySlot.Clear();
+        pendingAttackResults.Clear();
+        foreach (BoardSlot slot in playerSlots)
+        {
+            if (slot != null) slot.ClearSlotReferenceOnly();
+        }
+        foreach (BoardSlot slot in opponentSlots)
+        {
+            if (slot != null) slot.ClearSlotReferenceOnly();
+        }
+        Debug.Log("BOARD MANAGER || All boards cleared for reset");
+    }
+
     public void ShowValidDropFeedback(bool isPlayerBoard)
     {
         SpriteRenderer renderer = isPlayerBoard ? playerZoneRenderer : opponentZoneRenderer;

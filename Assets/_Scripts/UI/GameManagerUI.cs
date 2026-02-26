@@ -25,6 +25,13 @@ public class GameManagerUI : MonoBehaviour
 	[Header("Round Display")]
 	[SerializeField] private TextMeshProUGUI roundText;
 
+	[Header("Reset")]
+	[SerializeField] private Button resetBtn;
+
+	[Header("Game Over")]
+	[SerializeField] private GameObject gameOverPanel;
+	[SerializeField] private TextMeshProUGUI gameOverText;
+
 	private PlayerNetwork localPlayer;
 
 	private void Awake()
@@ -38,6 +45,10 @@ public class GameManagerUI : MonoBehaviour
 		if (readyBtn != null)
 		{
 			readyBtn.onClick.AddListener(OnReadyButtonClicked);
+		}
+		if (resetBtn != null)
+		{
+			resetBtn.onClick.AddListener(OnResetButtonClicked);
 		}
 
 		// subscribe to game manager phase changes
@@ -54,6 +65,10 @@ public class GameManagerUI : MonoBehaviour
 		if (opponentReadyIndicator != null)
 		{
 			opponentReadyIndicator.SetActive(false);
+		}
+		if (gameOverPanel != null)
+		{
+			gameOverPanel.SetActive(false);
 		}
 	}
 	
@@ -79,6 +94,14 @@ public class GameManagerUI : MonoBehaviour
 
 		// check opponent ready status
 		CheckOpponentStatus();
+	}
+
+	private void OnResetButtonClicked()
+	{
+		if (GameManager.Instance != null && NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient)
+		{
+			GameManager.Instance.RequestResetGameServerRpc();
+		}
 	}
 
 	private void OnReadyButtonClicked()
@@ -308,6 +331,32 @@ public class GameManagerUI : MonoBehaviour
 		if (manaText != null) manaText.text = $"Mana: {localPlayer.GetMana()}";
 		if (apText != null) apText.text = $"AP: {localPlayer.GetAP()}/5";
 		if (hpText != null) hpText.text = $"HP: {localPlayer.GetHP()}";
+	}
+
+	public void ShowGameOver(bool isWin)
+	{
+		if (gameOverPanel != null)
+		{
+			gameOverPanel.SetActive(true);
+		}
+		if (gameOverText != null)
+		{
+			gameOverText.text = isWin ? "YOU WIN!" : "YOU LOSE";
+			gameOverText.color = isWin ? Color.green : Color.red;
+		}
+
+		if (readyBtn != null)
+		{
+			readyBtn.interactable = false;
+		}
+	}
+
+	public void HideGameOver()
+	{
+		if (gameOverPanel != null)
+		{
+			gameOverPanel.SetActive(false);
+		}
 	}
 
 

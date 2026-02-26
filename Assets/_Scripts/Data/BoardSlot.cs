@@ -261,6 +261,13 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         }
     }
 
+    /// <summary>Clears slot reference without destroying (e.g. card already destroyed during full board reset).</summary>
+    public void ClearSlotReferenceOnly()
+    {
+        occupyingCard = null;
+        UpdateVisual();
+    }
+
     private void UpdateVisual()
     {
         if (spriteRenderer == null) return;

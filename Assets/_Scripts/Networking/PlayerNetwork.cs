@@ -9,7 +9,7 @@ public class PlayerNetwork : NetworkBehaviour {
 
 	private NetworkVariable<PlayerData> playerData = new NetworkVariable<PlayerData>(
 		new PlayerData {
-			Health = 10, // changed from 20 to 10
+			Health = 4, // changed from 20 to 5
 			Mana = 0,
 			ActionPoints = 5,
 			IsReady = false,
@@ -196,6 +196,24 @@ public class PlayerNetwork : NetworkBehaviour {
 		playerData.Value = data;
 
 		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} - New turn: 5 AP, {data.Mana} Mana");
+	}
+
+	/// <summary>Server only. Resets this player to initial game state (HP, Mana, AP, ready, hand, board).</summary>
+	public void ResetPlayerStateServer() {
+		if (!IsServer) return;
+		PlayerData data = new PlayerData {
+			Health = 4,
+			Mana = 0,
+			ActionPoints = 5,
+			IsReady = false,
+			CardsInHandCount = 0,
+			PlayerName = playerData.Value.PlayerName,
+			HandCardIds = default,
+			BoardCardIds = default,
+			BoardCardCharges = default,
+		};
+		playerData.Value = data;
+		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} reset to initial state");
 	}
 
 	// bypass the phase check for automatic draw at start of turn

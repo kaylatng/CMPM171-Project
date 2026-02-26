@@ -228,19 +228,40 @@ public class GameManager : NetworkBehaviour
 
 	private bool CheckWinCondition()
 	{
-		// check if any player has HP <= 0
+		if (NetworkManager.Singleton == null) return false;
+
+		// find any player with HP <= 0
+		ulong loserId = ulong.MaxValue;
 		foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
 		{
-			if (client.PlayerObject.TryGetComponent<PlayerNetwork>(out var player))
+			if (client.PlayerObject != null && client.PlayerObject.TryGetComponent<PlayerNetwork>(out var player))
 			{
-				if (player.GetCurrentHealth() <= 0) {
-					// TODO: Implement proper win/loss handling
-					Debug.Log($"GAME MANAGER || Player {player.OwnerClientId} has been defeated!");
-					return true;
+				if (player.GetCurrentHealth() <= 0)
+				{
+					loserId = client.ClientId;
+					Debug.Log($"GAME MANAGER || Player {loserId} has been defeated!");
+					break;
 				}
 			}
 		}
-		return false;
+
+		if (loserId == ulong.MaxValue)
+			return false;
+
+		// winner is the other connected client (for 1v1)
+		ulong winnerId = loserId;
+		foreach (var id in NetworkManager.Singleton.ConnectedClientsIds)
+		{
+			if (id != loserId)
+			{
+				winnerId = id;
+				break;
+			}
+		}
+
+		Debug.Log($"GAME MANAGER || Game over. Winner: {winnerId}, Loser: {loserId}");
+		GameOverClientRpc(winnerId, loserId);
+		return true;
 	}
 
 	[ClientRpc]
@@ -288,6 +309,23 @@ public class GameManager : NetworkBehaviour
 		}
 	}
 
+	[ClientRpc]
+	private void GameOverClientRpc(ulong winnerClientId, ulong loserClientId)
+	{
+		if (GameManagerUI.Instance == null || NetworkManager.Singleton == null)
+			return;
+
+		ulong localId = NetworkManager.Singleton.LocalClientId;
+		if (localId == winnerClientId)
+		{
+			GameManagerUI.Instance.ShowGameOver(true);
+		}
+		else if (localId == loserClientId)
+		{
+			GameManagerUI.Instance.ShowGameOver(false);
+		}
+	}
+
 	public bool CanPlayCards()
 	{
 		return CurrentPhase.Value == GamePhase.Planning;
@@ -301,6 +339,48 @@ public class GameManager : NetworkBehaviour
 	public bool CanAttack()
 	{
 		return CurrentPhase.Value == GamePhase.Planning;
+	}
+
+	/// <summary>Any client can request a full game reset. Keeps host and client connected; resets all stats and board.</summary>
+	[ServerRpc(RequireOwnership = false)]
+	public void RequestResetGameServerRpc(ServerRpcParams serverRpcParams = default)
+	{
+		if (!IsServer) return;
+
+		Debug.Log("GAME MANAGER || Reset requested - resetting game to beginning");
+		StopAllCoroutines();
+		attackIntents.Clear();
+		CurrentRound.Value = 0;
+		CurrentPhase.Value = GamePhase.ResourceGain;
+
+		if (DeckManager.Instance != null)
+			DeckManager.Instance.ResetDeck();
+
+		foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+		{
+			if (client.PlayerObject != null && client.PlayerObject.TryGetComponent<PlayerNetwork>(out var player))
+				player.ResetPlayerStateServer();
+		}
+
+		ResetGameVisualsClientRpc();
+		StartCoroutine(ProcessResourceGain());
+	}
+
+	[ClientRpc]
+	private void ResetGameVisualsClientRpc()
+	{
+		if (BoardManager.Instance != null)
+			BoardManager.Instance.ClearAllBoardsForReset();
+		if (CardManager.Instance != null)
+		{
+			CardManager.Instance.ClearHandZone(true);
+			CardManager.Instance.ClearHandZone(false);
+		}
+		if (GameManagerUI.Instance != null)
+		{
+			GameManagerUI.Instance.HideGameOver();
+		}
+		Debug.Log("GAME MANAGER || Client: boards and hands cleared");
 	}
 
 	public override void OnNetworkDespawn()
