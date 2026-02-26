@@ -29,10 +29,10 @@ public class DeckManager : MonoBehaviour
         }
 
         // add 6 modifier spell cards (ID: 60-65)
-        for (int i = 60; i <= 65; i++)
-        {
-            masterDeck.Add(i);
-        }
+        // for (int i = 60; i <= 65; i++)
+        // {
+        //     masterDeck.Add(i);
+        // }
         Debug.Log($"DECK MANAGER || Deck Initialized: {masterDeck.Count} cards.");
     }
 
