@@ -23,5 +23,5 @@ MonoBehaviour:
   destroyOnEmpty: 1
   cardArt: {fileID: -1276851855702364539, guid: 52d497cf9fa0cca429b2ae1d7582d541, type: 3}
   themeColor: {r: 0, g: 0, b: 0, a: 0}
-  tierFrame: {fileID: 7216039863150738475, guid: 9a26e648fd26057458ec29fd9c0acc13, type: 3}
+  tierFrame: {fileID: 7216039863150738475, guid: b44ef0a019773b5458d58603f3b03621, type: 3}
   description: 
