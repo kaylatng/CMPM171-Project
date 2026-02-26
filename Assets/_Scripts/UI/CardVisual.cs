@@ -66,6 +66,8 @@ public class CardVisual : MonoBehaviour
                 cardRenderer.color = (id >= 60) ? Color.yellow : Color.white;
             }
         }
+
+        Debug.Log($"CARD VISUAL || Initialize id={id}, data={data?.name}, tierFrame={data?.tierFrame}");
     }
     
     public void UpdateSorting(int baseSortingOrder)

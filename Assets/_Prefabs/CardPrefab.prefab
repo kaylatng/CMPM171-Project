@@ -338,7 +338,7 @@ MonoBehaviour:
   nameText: {fileID: 0}
   cardRenderer: {fileID: -7940892478253442166}
   faceRenderer: {fileID: 4167609983181074220}
-  frameRenderer: {fileID: 6008162821027363, guid: e9751400a3ea57349a422018368ac5a0, type: 3}
+  frameRenderer: {fileID: 6008162821027363}
   CardID: 0
 --- !u!114 &65603005142070742
 MonoBehaviour:
