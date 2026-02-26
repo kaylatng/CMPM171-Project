@@ -9,7 +9,7 @@ public class PlayerNetwork : NetworkBehaviour {
 
 	private NetworkVariable<PlayerData> playerData = new NetworkVariable<PlayerData>(
 		new PlayerData {
-			Health = 20,
+			Health = 10, // changed from 20 to 10
 			Mana = 0,
 			ActionPoints = 5,
 			IsReady = false,
