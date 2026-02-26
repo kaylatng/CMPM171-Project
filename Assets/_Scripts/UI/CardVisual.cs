@@ -37,20 +37,8 @@ public class CardVisual : MonoBehaviour
         currentCharges = (data != null && data.maxCharges > 0) ? data.maxCharges : 1;
         scheduledToAttack = false;
 
-        if (cardRenderer != null)
-        {
-            cardRenderer.sortingOrder = 0; // Background layer
-        }
-        
-        if (faceRenderer != null)
-        {
-            faceRenderer.sortingOrder = 1; // Face layer (above background)
-        }
-
-        if (frameRenderer != null)
-        {
-            frameRenderer.sortingOrder = 2; // Frame layer (above face)
-        }
+        // Default local layering; board/hand managers will override base order per card
+        UpdateSorting(0);
         
         if (data != null)
         {
@@ -77,6 +65,33 @@ public class CardVisual : MonoBehaviour
             {
                 cardRenderer.color = (id >= 60) ? Color.yellow : Color.white;
             }
+        }
+    }
+    
+    public void UpdateSorting(int baseSortingOrder)
+    {
+        if (cardRenderer != null)
+        {
+            cardRenderer.sortingOrder = baseSortingOrder;
+        }
+
+        if (faceRenderer != null)
+        {
+            // Ensure face/frame share the same sorting layer as the main card sprite
+            if (cardRenderer != null)
+            {
+                faceRenderer.sortingLayerID = cardRenderer.sortingLayerID;
+            }
+            faceRenderer.sortingOrder = baseSortingOrder + 1;
+        }
+
+        if (frameRenderer != null)
+        {
+            if (cardRenderer != null)
+            {
+                frameRenderer.sortingLayerID = cardRenderer.sortingLayerID;
+            }
+            frameRenderer.sortingOrder = baseSortingOrder + 2;
         }
     }
     
@@ -115,7 +130,6 @@ public class CardVisual : MonoBehaviour
                     cardRenderer.sprite = cardBackSprite;
                     cardRenderer.color = Color.white;
                 }
-                cardRenderer.sortingOrder = 2; // card back above default background
                 cardRenderer.enabled = true;
             }
         }
@@ -132,7 +146,6 @@ public class CardVisual : MonoBehaviour
             }
             if (cardRenderer != null)
             {
-                cardRenderer.sortingOrder = 0; // background layer when face-up
                 if (currentCardData != null)
                 {
                     cardRenderer.sprite = null;

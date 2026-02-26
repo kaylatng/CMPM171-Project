@@ -254,11 +254,19 @@ public class CardManager : MonoBehaviour
                 Time.deltaTime * cardMoveSpeed
             );
 
-            // Update sorting order
-            SpriteRenderer sr = cardData.cardObject.GetComponent<SpriteRenderer>();
-            if (sr != null)
+            // Update sorting order for the whole card (frame above face, face above background)
+            CardVisual cv = cardData.cardObject.GetComponent<CardVisual>();
+            if (cv != null)
             {
-                sr.sortingOrder = finalSortingOrder;
+                cv.UpdateSorting(finalSortingOrder);
+            }
+            else
+            {
+                SpriteRenderer sr = cardData.cardObject.GetComponent<SpriteRenderer>();
+                if (sr != null)
+                {
+                    sr.sortingOrder = finalSortingOrder;
+                }
             }
         }
     }

@@ -830,15 +830,21 @@ public class BoardManager : MonoBehaviour
             cardTargetPositions[card] = targetPos;
             cardBoardIndices[card] = i;
 
-            // Set sorting order (face-down cards keep card back above prefab "Square" by using 2 + index)
-            SpriteRenderer sr = card.GetComponent<SpriteRenderer>();
-            if (sr != null)
+            // Set sorting order for the whole card (frame above face, face above background)
+            var cv = card.GetComponent<CardVisual>();
+            if (cv != null)
             {
-                var cv = card.GetComponent<CardVisual>();
-                if (cv != null && cv.IsFaceDown)
-                    sr.sortingOrder = 2 + i;
-                else
+                // Face-down cards keep their back slightly above the base order, mirroring previous 2 + index behaviour
+                int baseOrder = cv.IsFaceDown ? 2 + i : i;
+                cv.UpdateSorting(baseOrder);
+            }
+            else
+            {
+                SpriteRenderer sr = card.GetComponent<SpriteRenderer>();
+                if (sr != null)
+                {
                     sr.sortingOrder = i;
+                }
             }
         }
     }
