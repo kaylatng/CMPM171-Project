@@ -164,7 +164,14 @@ public class GameManager : NetworkBehaviour
 			int damage = 1;
 			if (library != null)
 			{
+				// Look up card data based on current tier stored on the server
+				int tier = attacker != null ? attacker.GetBoardCardTier(slotIndex) : 1;
 				CardData cardData = library.GetTierOneAssetFromPool(cardId);
+				// Walk the nextTier chain up to the stored tier (1 = base, 2 = next, etc.)
+				for (int step = 1; step < tier && cardData != null && cardData.nextTier != null; step++)
+				{
+					cardData = cardData.nextTier;
+				}
 				if (cardData != null) damage = cardData.attackDamage;
 			}
 

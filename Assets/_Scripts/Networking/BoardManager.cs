@@ -651,37 +651,68 @@ public class BoardManager : MonoBehaviour
         cardTargetPositions.Remove(cardToMerge);
         Destroy(cardToMerge);
 
-        // UPGRADE THE TARGET CARD TO NEXT TIER
-        if (currentData.nextTier != null)
-        {
-            Debug.Log($"BOARD MANAGER || Upgrading card from tier {currentData.tier} to tier {currentData.nextTier.tier}");
+		// UPGRADE THE TARGET CARD TO NEXT TIER
+		if (currentData.nextTier != null)
+		{
+			Debug.Log($"BOARD MANAGER || Upgrading card from tier {currentData.tier} to tier {currentData.nextTier.tier}");
             
-            // Update the visual with new tier data
-            targetVisual.Initialize(targetVisual.CardID, currentData.nextTier);
+			// Update the visual with new tier data (frame, art, local charges)
+			targetVisual.Initialize(targetVisual.CardID, currentData.nextTier);
+
+			// Tell the server about the new tier + max charges so damage/charges are authoritative
+			if (isPlayerBoard && Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsClient)
+			{
+				var localPlayer = Unity.Netcode.NetworkManager.Singleton.LocalClient?.
+					PlayerObject?.GetComponent<PlayerNetwork>();
+				if (localPlayer != null)
+				{
+					// Prefer slot index if this card is in a BoardSlot; otherwise fall back to board index
+					int slotIndex = -1;
+					var d = targetCard.GetComponent<CardDraggable>();
+					if (d != null && d.CurrentSlot != null)
+					{
+						slotIndex = d.CurrentSlot.SlotIndex;
+					}
+					else
+					{
+						slotIndex = GetCardBoardIndex(targetCard, true);
+					}
+
+					if (slotIndex >= 0)
+					{
+						int newTier = targetVisual.GetCurrentTier();
+						int newMaxCharges = (currentData.nextTier.maxCharges > 0)
+							? currentData.nextTier.maxCharges
+							: targetVisual.CurrentCharges;
+						localPlayer.UpgradeBoardCardTierServerRpc(slotIndex, newTier, newMaxCharges);
+						Debug.Log($"BOARD MANAGER || Notified server of tier upgrade slot {slotIndex} -> tier {newTier}, charges {newMaxCharges}");
+					}
+				}
+			}
             
-            // Visual feedback for upgrade
-            if (targetSR != null)
-            {
-                targetSR.color = mergeFlashColor;
-            }
+			// Visual feedback for upgrade
+			if (targetSR != null)
+			{
+				targetSR.color = mergeFlashColor;
+			}
             
-            yield return new WaitForSeconds(0.2f);
+			yield return new WaitForSeconds(0.2f);
             
-            if (targetSR != null)
-            {
-                targetSR.color = currentData.nextTier.themeColor;
-            }
-        }
-        else
-        {
-            Debug.Log($"BOARD MANAGER || Card is already max tier {currentData.tier}");
+			if (targetSR != null)
+			{
+				targetSR.color = currentData.nextTier.themeColor;
+			}
+		}
+		else
+		{
+			Debug.Log($"BOARD MANAGER || Card is already max tier {currentData.tier}");
             
-            // Restore original color if already max tier
-            if (targetSR != null)
-            {
-                targetSR.color = targetOriginalColor;
-            }
-        }
+			// Restore original color if already max tier
+			if (targetSR != null)
+			{
+				targetSR.color = targetOriginalColor;
+			}
+		}
 
         // Reset target card scale
         targetCard.transform.localScale = targetStartScale;

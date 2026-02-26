@@ -34,6 +34,7 @@ public class PlayerNetwork : NetworkBehaviour {
 		public FixedList32Bytes<int> HandCardIds;
 		public FixedList32Bytes<int> BoardCardIds;
 		public FixedList32Bytes<int> BoardCardCharges; // attack charges per slot (same order as BoardCardIds)
+		public FixedList32Bytes<int> BoardCardTiers;   // tier per slot (1 = base, 2, 3...)
 
 		public void UpdateHandCount() {
 			CardsInHandCount = HandCardIds.Length;
@@ -101,6 +102,25 @@ public class PlayerNetwork : NetworkBehaviour {
 				for (int i = 0; i < BoardCardCharges.Length; i++) {
 					int ch = BoardCardCharges[i];
 					serializer.SerializeValue(ref ch);
+				}
+			}
+
+			// serialize BoardCardTiers
+			if (serializer.IsReader) {
+				int tierCount = 0;
+				serializer.SerializeValue(ref tierCount);
+				BoardCardTiers.Clear();
+				for (int i = 0; i < tierCount; i++) {
+					int tier = 1;
+					serializer.SerializeValue(ref tier);
+					BoardCardTiers.Add(tier);
+				}
+			} else {
+				int tierCount = BoardCardTiers.Length;
+				serializer.SerializeValue(ref tierCount);
+				for (int i = 0; i < BoardCardTiers.Length; i++) {
+					int tier = BoardCardTiers[i];
+					serializer.SerializeValue(ref tier);
 				}
 			}
 		}
@@ -211,6 +231,7 @@ public class PlayerNetwork : NetworkBehaviour {
 			HandCardIds = default,
 			BoardCardIds = default,
 			BoardCardCharges = default,
+			BoardCardTiers = default,
 		};
 		playerData.Value = data;
 		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} reset to initial state");
@@ -441,12 +462,15 @@ public class PlayerNetwork : NetworkBehaviour {
 		data.HandCardIds.Remove(cardId);
 		data.UpdateHandCount();
 
-		// ensure BoardCardIds and BoardCardCharges have 3 slots
+		// ensure BoardCardIds / charges / tiers have 3 slots
 		while (data.BoardCardIds.Length < 3) {
 			data.BoardCardIds.Add(-1);
 		}
 		while (data.BoardCardCharges.Length < 3) {
 			data.BoardCardCharges.Add(0);
+		}
+		while (data.BoardCardTiers.Length < 3) {
+			data.BoardCardTiers.Add(1);
 		}
 
 		// if slot already has a card, return that card to hand (no extra AP cost)
@@ -473,6 +497,7 @@ public class PlayerNetwork : NetworkBehaviour {
 		}
 		data.BoardCardIds[slotIndex] = cardId;
 		data.BoardCardCharges[slotIndex] = maxCharges;
+		data.BoardCardTiers[slotIndex] = 1; // newly played card starts at base tier
 		playerData.Value = data;
 
 		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} played card {cardId} to slot {slotIndex}");
@@ -580,10 +605,44 @@ public class PlayerNetwork : NetworkBehaviour {
 		PlayerData data = playerData.Value;
 		while (data.BoardCardIds.Length <= slotIndex) data.BoardCardIds.Add(-1);
 		while (data.BoardCardCharges.Length <= slotIndex) data.BoardCardCharges.Add(0);
+		while (data.BoardCardTiers.Length <= slotIndex) data.BoardCardTiers.Add(1);
 		data.BoardCardIds[slotIndex] = -1;
 		data.BoardCardCharges[slotIndex] = 0;
+		data.BoardCardTiers[slotIndex] = 1;
 		playerData.Value = data;
 		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} slot {slotIndex} card removed (out of charges)");
+	}
+
+	/// <summary>Server only. Upgrade card tier and refresh its max charges in a board slot.</summary>
+	[ServerRpc]
+	public void UpgradeBoardCardTierServerRpc(int slotIndex, int newTier, int newMaxCharges) {
+		if (!IsServer) return;
+		if (slotIndex < 0 || slotIndex >= 3) return;
+
+		PlayerData data = playerData.Value;
+		while (data.BoardCardIds.Length <= slotIndex) data.BoardCardIds.Add(-1);
+		while (data.BoardCardCharges.Length <= slotIndex) data.BoardCardCharges.Add(0);
+		while (data.BoardCardTiers.Length <= slotIndex) data.BoardCardTiers.Add(1);
+
+		// Only upgrade if there is actually a card in this slot
+		if (data.BoardCardIds[slotIndex] == -1) return;
+
+		int clampedTier = Mathf.Clamp(newTier, 1, 3);
+		data.BoardCardTiers[slotIndex] = clampedTier;
+		if (newMaxCharges > 0) {
+			data.BoardCardCharges[slotIndex] = newMaxCharges;
+		}
+
+		playerData.Value = data;
+		Debug.Log($"PLAYER NETWORK || Upgraded slot {slotIndex} to tier {clampedTier}, maxCharges {newMaxCharges}");
+	}
+
+	/// <summary>Get current tier of a board card on the server (1 if unset).</summary>
+	public int GetBoardCardTier(int slotIndex) {
+		var tiers = playerData.Value.BoardCardTiers;
+		if (slotIndex < 0 || slotIndex >= tiers.Length) return 1;
+		int t = tiers[slotIndex];
+		return (t <= 0) ? 1 : t;
 	}
 
 	[ClientRpc]
