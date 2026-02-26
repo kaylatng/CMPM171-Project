@@ -21,6 +21,7 @@ public class GameManagerUI : MonoBehaviour
 	[Header("Opponent Status")]
 	[SerializeField] private TextMeshProUGUI opponentStatusText;
 	[SerializeField] private GameObject opponentReadyIndicator;
+	[SerializeField] private TextMeshProUGUI opponentHpText;
 
 	[Header("Round Display")]
 	[SerializeField] private TextMeshProUGUI roundText;
@@ -228,6 +229,19 @@ public class GameManagerUI : MonoBehaviour
 					{
 						opponentStatusText.text = opponentReady ? "Opponent: Ready ✓" : "Opponent: Planning...";
 					}
+
+					// Update opponent HP display
+					if (opponentHpText != null)
+					{
+						int oppHp = opponentPlayer.GetCurrentHealth();
+						opponentHpText.text = $"Opponent HP: {oppHp}/20";
+						if (oppHp <= 5)
+							opponentHpText.color = Color.red;
+						else if (oppHp <= 10)
+							opponentHpText.color = Color.yellow;
+						else
+							opponentHpText.color = Color.white;
+					}
 					return;
 				}
 			}
@@ -237,6 +251,11 @@ public class GameManagerUI : MonoBehaviour
 		if (opponentStatusText != null)
 		{
 			opponentStatusText.text = "Opponent: Not Connected";
+		}
+		if (opponentHpText != null)
+		{
+			opponentHpText.text = "Opponent HP: --";
+			opponentHpText.color = Color.white;
 		}
 	}
 
