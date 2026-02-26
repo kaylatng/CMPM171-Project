@@ -84,20 +84,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             return;
         }
 
-        if (!CanBePlayed())
-        {
-            ShowCannotPlayFeedback();
-            return;
-        }
-
-        if (isSelected)
-        {
-            DeselectCard();
-        }
-        else
-        {
-            SelectCard();
-        }
+        // Card in hand: placement is drag-and-drop only; no tap-to-select-slot
     }
 
     public void SelectCard()

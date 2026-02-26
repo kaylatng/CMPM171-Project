@@ -73,30 +73,7 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
     public void OnPointerClick(PointerEventData eventData)
     {
         if (!isPlayerSlot) return; // can't click opponent slots
-        
-        if (CardDraggable.SelectedCard != null)
-        {
-            // check if the selected card can be played
-            if (!CardDraggable.SelectedCard.CanBePlayed())
-            {
-                Debug.Log($"BOARD SLOT || Cannot place card - insufficient resources or wrong phase");
-                ShowCannotPlaceFeedback();
-                return;
-            }
-
-            TryPlaceCard(CardDraggable.SelectedCard.gameObject);
-        }
-        else if (occupyingCard != null)
-        {
-            CardDraggable cardDraggable = occupyingCard.GetComponent<CardDraggable>();
-            if (cardDraggable != null)
-            {
-                if (isPlayerSlot)
-                {
-                    cardDraggable.SelectCard();
-                }
-            }
-        }
+        // Placement is drag-and-drop only; tap on slot does not place a selected card
     }
 
     public void OnDrop(PointerEventData eventData)

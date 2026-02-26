@@ -238,27 +238,10 @@ public class BoardManager : MonoBehaviour
     
     private void UpdateSlotBlinking()
     {
-        // Check if a card is selected or being dragged from hand
+        // Blink slots only when dragging a card from hand (drag-and-drop placement)
         bool shouldBlink = false;
         
-        // Check if a card is selected
-        if (CardDraggable.SelectedCard != null)
-        {
-            CardDraggable selected = CardDraggable.SelectedCard;
-            
-            // Check if card is in hand (not on board)
-            // When dragging, card is unparented, so check IsOnBoard property
-            if (!selected.IsOnBoard)
-            {
-                // Also verify it's not currently on board
-                if (!IsCardOnBoard(selected.gameObject, true))
-                {
-                    shouldBlink = true;
-                }
-            }
-        }
-        
-        // Also check if any card is being dragged (even if not selected)
+        // Check if any card is being dragged from hand
         if (!shouldBlink)
         {
             // Check all cards in player hand
