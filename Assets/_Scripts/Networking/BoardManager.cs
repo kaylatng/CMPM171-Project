@@ -665,6 +665,7 @@ public class BoardManager : MonoBehaviour
 			Debug.Log($"BOARD MANAGER || Upgrading card from tier {currentData.tier} to tier {currentData.nextTier.tier}");
 			// Update the visual with new tier data (frame, art, local charges)
 			targetVisual.Initialize(targetVisual.CardID, currentData.nextTier);
+            targetVisual.TweenUpgradeStars();
 
 			// Tell the server about the new tier + max charges so damage/charges are authoritative
 			if (isPlayerBoard && Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsClient)

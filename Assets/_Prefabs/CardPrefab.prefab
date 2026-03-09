@@ -344,6 +344,33 @@ MonoBehaviour:
   - {fileID: 1754867352606105322, guid: 2f8413bf0d4183d498b06059dde427ab, type: 3}
   - {fileID: 3718054293430549712, guid: a7d6754166ef3fa43a43cbdfea19dae6, type: 3}
   CardID: 0
+  upgradeStarPopScale: 3.5
+  upgradeStarPopDuration: 1.1
+  upgradeStarStagger: 0.04
+  upgradeStarPopCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!114 &65603005142070742
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -744,6 +771,10 @@ PrefabInstance:
     m_TransformParent: {fileID: 7009686631014350295}
     m_Modifications:
     - target: {fileID: 1754867352606105322, guid: 2f8413bf0d4183d498b06059dde427ab, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1754867352606105322, guid: 2f8413bf0d4183d498b06059dde427ab, type: 3}
       propertyPath: m_SortingOrder
       value: 7
       objectReference: {fileID: 0}
@@ -918,6 +949,10 @@ PrefabInstance:
     - target: {fileID: 451502541900138216, guid: a7d6754166ef3fa43a43cbdfea19dae6, type: 3}
       propertyPath: m_Name
       value: Star3
+      objectReference: {fileID: 0}
+    - target: {fileID: 3718054293430549712, guid: a7d6754166ef3fa43a43cbdfea19dae6, type: 3}
+      propertyPath: m_Enabled
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3718054293430549712, guid: a7d6754166ef3fa43a43cbdfea19dae6, type: 3}
       propertyPath: m_SortingOrder

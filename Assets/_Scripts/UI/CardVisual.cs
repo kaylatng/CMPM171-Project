@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 
 public class CardVisual : MonoBehaviour
@@ -30,6 +31,13 @@ public class CardVisual : MonoBehaviour
     private const int HoverTopSortingOrder = 1000;
     private int currentBaseSortingOrder = 0;
     private bool isHovered = false;
+
+    [Header("Charge Star Tween (Upgrade)")]
+    [SerializeField] private float upgradeStarPopScale = 1.35f;
+    [SerializeField] private float upgradeStarPopDuration = 0.16f;
+    [SerializeField] private float upgradeStarStagger = 0.04f;
+    [SerializeField] private AnimationCurve upgradeStarPopCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+    private Coroutine upgradeStarTweenCoroutine;
 
     // Public getter for current card data
     public CardData CurrentCardData => currentCardData;
@@ -185,6 +193,73 @@ public class CardVisual : MonoBehaviour
                 if (chargeStars[i] != null)
                     chargeStars[i].enabled = showStars && (i < visibleCharges);
             }
+        }
+    }
+
+    /// <summary>
+    /// Upgrade-only effect: make the currently visible stars "pop" (scale large then tween back).
+    /// Called by merge/upgrade logic after Initialize(nextTier).
+    /// </summary>
+    public void TweenUpgradeStars()
+    {
+        if (!isActiveAndEnabled) return;
+        if (isFaceDown) return;
+        if (upgradeStarPopDuration <= 0f) return;
+
+        if (upgradeStarTweenCoroutine != null)
+        {
+            StopCoroutine(upgradeStarTweenCoroutine);
+            upgradeStarTweenCoroutine = null;
+        }
+        upgradeStarTweenCoroutine = StartCoroutine(TweenUpgradeStarsCoroutine());
+    }
+
+    private IEnumerator TweenUpgradeStarsCoroutine()
+    {
+        Transform starRoot = transform.Find("TiltPivot");
+        if (starRoot == null) starRoot = transform;
+
+        int visibleCharges = Mathf.Clamp(currentCharges, 0, 3);
+        if (visibleCharges <= 0) yield break;
+
+        var stars = new List<Transform>(visibleCharges);
+        var baseScales = new List<Vector3>(visibleCharges);
+
+        for (int i = 1; i <= visibleCharges; i++)
+        {
+            Transform star = starRoot.Find("Star" + i);
+            if (star == null) continue;
+            stars.Add(star);
+            baseScales.Add(star.localScale);
+        }
+
+        if (stars.Count == 0) yield break;
+
+        float dur = Mathf.Max(0.01f, upgradeStarPopDuration);
+        float stagger = Mathf.Max(0f, upgradeStarStagger);
+        float total = dur + (stagger * (stars.Count - 1));
+
+        float time = 0f;
+        while (time < total)
+        {
+            time += Time.deltaTime;
+
+            for (int i = 0; i < stars.Count; i++)
+            {
+                float tStar = Mathf.Clamp01((time - (i * stagger)) / dur);
+                float eased = upgradeStarPopCurve != null ? upgradeStarPopCurve.Evaluate(tStar) : tStar;
+
+                Vector3 baseScale = baseScales[i];
+                Vector3 popScale = baseScale * upgradeStarPopScale;
+                stars[i].localScale = Vector3.Lerp(popScale, baseScale, eased);
+            }
+
+            yield return null;
+        }
+
+        for (int i = 0; i < stars.Count; i++)
+        {
+            stars[i].localScale = baseScales[i];
         }
     }
     
