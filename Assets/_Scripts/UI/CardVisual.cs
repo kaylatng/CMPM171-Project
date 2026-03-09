@@ -131,10 +131,26 @@ public class CardVisual : MonoBehaviour
                 if (chargeStars[i] != null)
                 {
                     if (cardRenderer != null)
+                    {
                         chargeStars[i].sortingLayerID = cardRenderer.sortingLayerID;
+                    }
                     chargeStars[i].sortingOrder = baseOrder + 3;
                 }
             }
+        }
+
+        // Ensure the actual Star1/Star2/Star3 renderers (hierarchy) are sorted too.
+        // This covers the common case where the visible star SpriteRenderers are not the same objects referenced by chargeStars[].
+        Transform starRoot = transform.Find("TiltPivot");
+        if (starRoot == null) starRoot = transform;
+        for (int i = 1; i <= 3; i++)
+        {
+            Transform star = starRoot.Find("Star" + i);
+            if (star == null) continue;
+            SpriteRenderer sr = star.GetComponentInChildren<SpriteRenderer>();
+            if (sr == null) continue;
+            if (cardRenderer != null) sr.sortingLayerID = cardRenderer.sortingLayerID;
+            sr.sortingOrder = baseOrder + 3;
         }
     }
 
