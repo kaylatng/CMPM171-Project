@@ -15,7 +15,6 @@ public class GameManagerUI : MonoBehaviour
 	[Header("Resource Display")]
 	[SerializeField] private TextMeshProUGUI apText;
 	[SerializeField] private TextMeshProUGUI manaText;
-	[SerializeField] private TextMeshProUGUI healthText;
 	[SerializeField] private TextMeshProUGUI hpText;
 	
 	[Header("Opponent Status")]
@@ -305,22 +304,6 @@ public class GameManagerUI : MonoBehaviour
 		if (manaText != null)
 		{
 			manaText.text = $"Mana: {mana}";
-		}
-
-		if (healthText != null) {
-			healthText.text = $"HP: {health}/20";
-			
-			// color code health display
-			if (health <= 5)
-			{
-				healthText.color = Color.red;
-			} else if (health <= 10)
-			{
-				healthText.color = Color.yellow;
-			} else
-			{
-				healthText.color = Color.white;
-			}
 		}
 
 		if (hpText != null) {
