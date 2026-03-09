@@ -516,10 +516,18 @@ public class BoardManager : MonoBehaviour
 
         Debug.Log($"BOARD MANAGER || Placed card on {(isPlayerCard ? "player" : "opponent")} board ({targetBoard.Count}/{maxCardsPerBoard})");
 
-        // CHECK FOR MERGES after placing the card (player only; opponent merges only in reveal phase)
+        // CHECK FOR MERGES after placing the card.
+        // - Player board: merge immediately when a matching pair is on board.
+        // - Opponent board: also merge during the Planning phase so the local player
+        //   sees the opponent's upgrade animation as soon as they play a duplicate.
         if (isPlayerCard)
         {
-            CheckAndMergeCards(isPlayerCard);
+            CheckAndMergeCards(true);
+        }
+        else if (GameManager.Instance != null &&
+                 GameManager.Instance.CurrentPhase.Value == GameManager.GamePhase.Planning)
+        {
+            CheckAndMergeCards(false);
         }
 
         // Network notification
@@ -856,10 +864,6 @@ public class BoardManager : MonoBehaviour
                 yield return new WaitForSeconds(delayBetweenReveals);
             }
         }
-
-        // After all revealed, check for merges and play merge animation
-        yield return new WaitForSeconds(0.15f);
-        CheckAndMergeCards(false);
 
         // Capture opponent board state so only these cards stay face-up next round; new cards stay face-down until next reveal
         revealedOpponentCardIdsBySlot.Clear();
