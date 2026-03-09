@@ -35,7 +35,7 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
                 bool isLocalPlayerSlot = transform.parent.name == "PlayerBoardZone";
                 if (isLocalPlayerSlot != isPlayerSlot)
                 {
-                    Debug.Log($"BOARD SLOT || Slot {name} - Serialized isPlayerSlot: {isPlayerSlot}, Actual (by zone): {isLocalPlayerSlot}");
+                    // Debug.Log($"BOARD SLOT || Slot {name} - Serialized isPlayerSlot: {isPlayerSlot}, Actual (by zone): {isLocalPlayerSlot}");
                 }
                 return isLocalPlayerSlot;
             }

@@ -8,6 +8,8 @@ public class CardVisual : MonoBehaviour
     [SerializeField] private SpriteRenderer cardRenderer;
     [SerializeField] private SpriteRenderer faceRenderer;
     [SerializeField] private SpriteRenderer frameRenderer;
+    [Tooltip("Optional. Assign in order: Element 0 = Star1, 1 = Star2, 2 = Star3. Count shown = card data maxCharges.")]
+    [SerializeField] private SpriteRenderer[] chargeStars;
 
     public int CardID;
     
@@ -72,6 +74,7 @@ public class CardVisual : MonoBehaviour
             }
         }
 
+        RefreshChargeStars();
         Debug.Log($"CARD VISUAL || Initialize id={id}, data={data?.name}, tierFrame={data?.tierFrame}");
     }
     
@@ -119,6 +122,48 @@ public class CardVisual : MonoBehaviour
                 frameRenderer.sortingLayerID = cardRenderer.sortingLayerID;
             }
             frameRenderer.sortingOrder = baseOrder + 2;
+        }
+
+        if (chargeStars != null)
+        {
+            for (int i = 0; i < chargeStars.Length; i++)
+            {
+                if (chargeStars[i] != null)
+                {
+                    if (cardRenderer != null)
+                        chargeStars[i].sortingLayerID = cardRenderer.sortingLayerID;
+                    chargeStars[i].sortingOrder = baseOrder + 3;
+                }
+            }
+        }
+    }
+
+    /// <summary>Show N stars based on card data maxCharges (Star1..StarN). Hide the rest. Uses GameObjects by name so Star1/Star2/Star3 always match; chargeStars array is still used for sorting.</summary>
+    private void RefreshChargeStars()
+    {
+        int maxCh = (currentCardData != null && currentCardData.maxCharges > 0) ? currentCardData.maxCharges : 1;
+        bool showStars = !isFaceDown;
+        Transform starRoot = transform.Find("TiltPivot");
+        if (starRoot == null) starRoot = transform;
+        for (int i = 1; i <= 3; i++)
+        {
+            Transform star = starRoot.Find("Star" + i);
+            if (star != null)
+            {
+                bool visible = showStars && (i <= maxCh);
+                star.gameObject.SetActive(visible);
+                SpriteRenderer sr = star.GetComponentInChildren<SpriteRenderer>();
+                if (sr != null) sr.enabled = visible;
+            }
+        }
+        // Also update SpriteRenderer.enabled on chargeStars for sorting order consistency
+        if (chargeStars != null)
+        {
+            for (int i = 0; i < chargeStars.Length; i++)
+            {
+                if (chargeStars[i] != null)
+                    chargeStars[i].enabled = showStars && (i < maxCh);
+            }
         }
     }
     
@@ -181,6 +226,7 @@ public class CardVisual : MonoBehaviour
             }
         }
 
+        RefreshChargeStars();
         CardShadow shadow = GetComponent<CardShadow>();
         if (shadow != null) shadow.UpdateShadowSprite();
     }
@@ -238,6 +284,7 @@ public class CardVisual : MonoBehaviour
     public void SetCharges(int charges)
     {
         currentCharges = Mathf.Max(0, charges);
+        RefreshChargeStars();
     }
 
     /// <summary>
@@ -246,6 +293,7 @@ public class CardVisual : MonoBehaviour
     public bool ConsumeCharge()
     {
         currentCharges = Mathf.Max(0, currentCharges - 1);
+        RefreshChargeStars();
         return currentCharges > 0;
     }
 

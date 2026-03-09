@@ -663,7 +663,6 @@ public class BoardManager : MonoBehaviour
 		if (currentData.nextTier != null)
 		{
 			Debug.Log($"BOARD MANAGER || Upgrading card from tier {currentData.tier} to tier {currentData.nextTier.tier}");
-            
 			// Update the visual with new tier data (frame, art, local charges)
 			targetVisual.Initialize(targetVisual.CardID, currentData.nextTier);
 
