@@ -24,6 +24,11 @@ public class CardVisual : MonoBehaviour
     private bool scheduledToAttack = false;
     private const float AttackTiltAngle = -18f; // lean toward opponent (negative Z rotation)
 
+    // Hover sorting: when hovered, card renders above all other game board UI
+    private const int HoverTopSortingOrder = 1000;
+    private int currentBaseSortingOrder = 0;
+    private bool isHovered = false;
+
     // Public getter for current card data
     public CardData CurrentCardData => currentCardData;
     public bool IsFaceDown => isFaceDown;
@@ -72,19 +77,39 @@ public class CardVisual : MonoBehaviour
     
     public void UpdateSorting(int baseSortingOrder)
     {
+        currentBaseSortingOrder = baseSortingOrder;
+        if (!isHovered)
+        {
+            ApplySorting();
+        }
+    }
+
+    /// <summary>
+    /// Set whether this card is hovered. When true, card renders on top of all other game board UI.
+    /// </summary>
+    public void SetHovered(bool hovered)
+    {
+        if (isHovered == hovered) return;
+        isHovered = hovered;
+        ApplySorting();
+    }
+
+    private void ApplySorting()
+    {
+        int baseOrder = isHovered ? HoverTopSortingOrder : currentBaseSortingOrder;
+
         if (cardRenderer != null)
         {
-            cardRenderer.sortingOrder = baseSortingOrder;
+            cardRenderer.sortingOrder = baseOrder;
         }
 
         if (faceRenderer != null)
         {
-            // Ensure face/frame share the same sorting layer as the main card sprite
             if (cardRenderer != null)
             {
                 faceRenderer.sortingLayerID = cardRenderer.sortingLayerID;
             }
-            faceRenderer.sortingOrder = baseSortingOrder + 1;
+            faceRenderer.sortingOrder = baseOrder + 1;
         }
 
         if (frameRenderer != null)
@@ -93,7 +118,7 @@ public class CardVisual : MonoBehaviour
             {
                 frameRenderer.sortingLayerID = cardRenderer.sortingLayerID;
             }
-            frameRenderer.sortingOrder = baseSortingOrder + 2;
+            frameRenderer.sortingOrder = baseOrder + 2;
         }
     }
     

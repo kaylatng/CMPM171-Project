@@ -31,6 +31,8 @@ public class CardHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (!isHovering)
         {
             isHovering = true;
+            var cardVisual = GetComponent<CardVisual>();
+            if (cardVisual != null) cardVisual.SetHovered(true);
             OnHoverEnter?.Invoke();
         }
         
@@ -42,6 +44,8 @@ public class CardHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (isHovering)
         {
             isHovering = false;
+            var cardVisual = GetComponent<CardVisual>();
+            if (cardVisual != null) cardVisual.SetHovered(false);
             OnHoverExit?.Invoke();
         }
     }
@@ -80,6 +84,8 @@ public class CardHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (isHovering)
         {
             isHovering = false;
+            var cardVisual = GetComponent<CardVisual>();
+            if (cardVisual != null) cardVisual.SetHovered(false);
             OnHoverExit?.Invoke();
         }
     }

@@ -19,11 +19,11 @@ public class BoardManager : MonoBehaviour
     [SerializeField] private Transform opponentBoardZone;
 
     [Header("Card Layout")]
-    [SerializeField] private float cardSpacing = 2.0f;
+    [SerializeField] private float cardSpacing = 1.7f;
     [SerializeField] private float cardMoveSpeed = 12f;
     [SerializeField] private AnimationCurve layoutCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
     [Tooltip("Fixed X positions for the 3 slots (left, center, right). Cards stay in the slot they are placed in.")]
-    [SerializeField] private float[] slotPositionsX = new float[] { -2f, 0f, 2f };
+    [SerializeField] private float[] slotPositionsX = new float[] { -1.7f, 0f, 1.7f };
 
     [Header("Reveal Phase")]
     [SerializeField] private float revealFlipDuration = 0.25f;

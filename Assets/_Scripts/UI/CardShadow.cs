@@ -4,9 +4,9 @@ public class CardShadow : MonoBehaviour
 {
     [Header("Shadow Appearance")]
     [SerializeField] private Color shadowColor = new Color(0, 0, 0, 0.3f);
-    [SerializeField] private Vector3 shadowOffset = new Vector3(0.15f, -0.15f, 0.05f);
-    [SerializeField] private Vector3 dragShadowOffset = new Vector3(0.2f, -0.2f, 0.05f); // make bigger offset when dragging
-    [SerializeField] private Vector3 shadowScale = new Vector3(1.05f, 1.05f, 1f);
+    [SerializeField] private Vector3 shadowOffset = new Vector3(0.1f, -0.1f, 0.01f);
+    [SerializeField] private Vector3 dragShadowOffset = new Vector3(0.15f, -0.15f, 0.01f); // make bigger offset when dragging
+    [SerializeField] private Vector3 shadowScale = new Vector3(1.0f, 1.0f, 1f);
     
     [Header("Motion")]
     [SerializeField] private float interpolationSpeed = 8f;

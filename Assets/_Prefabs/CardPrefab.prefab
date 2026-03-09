@@ -414,12 +414,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CardShadow
   shadowColor: {r: 0, g: 0, b: 0, a: 0.3}
-  shadowOffset: {x: 0.15, y: -0.15, z: 0.05}
-  dragShadowOffset: {x: 0.2, y: -0.2, z: 0.05}
-  shadowScale: {x: 1.05, y: 1.05, z: 1}
+  shadowOffset: {x: 0.1, y: -0.1, z: 0.01}
+  dragShadowOffset: {x: 0.15, y: -0.15, z: 0.01}
+  shadowScale: {x: 1, y: 1, z: 1}
   interpolationSpeed: 8
   dragInterpolationSpeed: 4
-  showInHand: 0
+  showInHand: 1
   showWhenDragging: 1
   showOnBoard: 1
 --- !u!1 &3776071034082901224
