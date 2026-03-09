@@ -138,10 +138,15 @@ public class CardVisual : MonoBehaviour
         }
     }
 
-    /// <summary>Show N stars based on card data maxCharges (Star1..StarN). Hide the rest. Uses GameObjects by name so Star1/Star2/Star3 always match; chargeStars array is still used for sorting.</summary>
+    /// <summary>
+    /// Show stars based on the card's current remaining charges.
+    /// Uses GameObjects named Star1/Star2/Star3 on the card (under TiltPivot if present),
+    /// and also updates the optional chargeStars array for correct sorting.
+    /// </summary>
     private void RefreshChargeStars()
     {
-        int maxCh = (currentCardData != null && currentCardData.maxCharges > 0) ? currentCardData.maxCharges : 1;
+        // Number of visible stars = remaining charges on this card
+        int visibleCharges = Mathf.Max(0, currentCharges);
         bool showStars = !isFaceDown;
         Transform starRoot = transform.Find("TiltPivot");
         if (starRoot == null) starRoot = transform;
@@ -150,7 +155,7 @@ public class CardVisual : MonoBehaviour
             Transform star = starRoot.Find("Star" + i);
             if (star != null)
             {
-                bool visible = showStars && (i <= maxCh);
+                bool visible = showStars && (i <= visibleCharges);
                 star.gameObject.SetActive(visible);
                 SpriteRenderer sr = star.GetComponentInChildren<SpriteRenderer>();
                 if (sr != null) sr.enabled = visible;
@@ -162,7 +167,7 @@ public class CardVisual : MonoBehaviour
             for (int i = 0; i < chargeStars.Length; i++)
             {
                 if (chargeStars[i] != null)
-                    chargeStars[i].enabled = showStars && (i < maxCh);
+                    chargeStars[i].enabled = showStars && (i < visibleCharges);
             }
         }
     }
