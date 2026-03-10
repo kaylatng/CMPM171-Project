@@ -43,6 +43,9 @@ public class NetworkManagerUI : MonoBehaviour
 	private const string QuickplayDescriptionKey = "ui/menu/quickplayDescription";
 	private const string QuickplayWaitingKey = "ui/menu/quickplayWaiting";
 
+	// Tracks whether the host has already triggered the game start scene load.
+	private bool hasStartedGame = false;
+
 	private void Awake()
 	{
 		if (serverBtn != null)
@@ -92,6 +95,8 @@ public class NetworkManagerUI : MonoBehaviour
 			SetStatus("Failed to start host.");
 			return;
 		}
+
+		hasStartedGame = false;
 
 		ShowAndFetchHostIp();
 		SetWaitingStatus();
@@ -203,17 +208,8 @@ public class NetworkManagerUI : MonoBehaviour
 			}
 			else
 			{
-				// A remote client connected - start the game for everyone.
+				// A remote client connected - status will be updated when Update() detects 2 clients.
 				SetStatus("Opponent connected. Starting game!");
-
-				if (waitingSpinner != null)
-					waitingSpinner.SetActive(false);
-
-				if (!string.IsNullOrWhiteSpace(gameSceneName) &&
-				    NetworkManager.Singleton.SceneManager != null)
-				{
-					NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
-				}
 			}
 		}
 		// Pure client (non-host): we successfully connected to the host.
@@ -235,6 +231,8 @@ public class NetworkManagerUI : MonoBehaviour
 			NetworkManager.Singleton.Shutdown();
 		}
 
+		hasStartedGame = false;
+
 		SetStatus("");
 		HideHostIp();
 
@@ -255,6 +253,37 @@ public class NetworkManagerUI : MonoBehaviour
 		{
 			// Fallback English string if localization isn't wired.
 			SetStatus("Hosting game. Waiting for opponent.");
+		}
+	}
+
+	private void Update()
+	{
+		if (NetworkManager.Singleton == null) return;
+
+		// Only the host decides when to start the game.
+		if (!NetworkManager.Singleton.IsHost) return;
+
+		if (hasStartedGame) return;
+
+		int connectedCount = NetworkManager.Singleton.ConnectedClientsList.Count;
+		// host (server) + 1 client = 2 connected clients
+		if (connectedCount >= 2)
+		{
+			hasStartedGame = true;
+			SetStatus("Opponent connected. Starting game!");
+
+			if (waitingSpinner != null)
+				waitingSpinner.SetActive(false);
+
+			if (!string.IsNullOrWhiteSpace(gameSceneName) &&
+			    NetworkManager.Singleton.SceneManager != null)
+			{
+				NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
+			}
+			else
+			{
+				Debug.LogWarning("NETWORK UI || Cannot load game scene: SceneManager is null or gameSceneName is empty.");
+			}
 		}
 	}
 
