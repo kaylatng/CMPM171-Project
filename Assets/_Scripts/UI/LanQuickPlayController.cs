@@ -94,6 +94,22 @@ public class LanQuickPlayController : MonoBehaviour
         isAttemptInProgress = false;
     }
 
+    /// <summary>
+    /// Stop any in-progress Quick Play attempt and tear down the discovery responder.
+    /// Call this from a Cancel/Back button on your main menu.
+    /// </summary>
+    public void CancelQuickPlay()
+    {
+        isAttemptInProgress = false;
+        StopAllCoroutines();
+
+        if (responderClient != null)
+        {
+            responderClient.Close();
+            responderClient = null;
+        }
+    }
+
     private IEnumerator TryDiscoverHost(Action<string> onResult)
     {
         UdpClient client = null;

@@ -49,3 +49,11 @@ MonoBehaviour:
     translations:
     - 
     - "\xDAnete"
+  - key: ui/menu/quickplayDescription
+    translations:
+    - 
+    - Encuentra un oponente al instante.
+  - key: ui/menu/quickplayWaiting
+    translations:
+    - 
+    - "Juego anfitri\xF3n. Esperando al oponente."

@@ -26,6 +26,12 @@ public class NetworkManagerUI : MonoBehaviour
 	[Tooltip("Optional status label to show host/client connection state (e.g. 'Waiting for opponent...').")]
 	[SerializeField] private TextMeshProUGUI statusText;
 
+	[Tooltip("Optional LocalizedTMPText attached to the status label, so we can switch keys at runtime.")]
+	[SerializeField] private LocalizedTMPText statusLocalized;
+
+	[Tooltip("Spinner object (e.g. rotating '|') shown while waiting for opponent.")]
+	[SerializeField] private GameObject waitingSpinner;
+
 	[Header("Direct IP (optional - for Client)")]
 	[Tooltip("Leave empty to use 127.0.0.1 (same machine). Set to host's IP for LAN/internet.")]
 	[SerializeField] private InputField ipAddressInputField;
@@ -33,6 +39,9 @@ public class NetworkManagerUI : MonoBehaviour
 	[SerializeField] private InputField portInputField;
 
 	private const ushort DefaultPort = 7778;
+
+	private const string QuickplayDescriptionKey = "ui/menu/quickplayDescription";
+	private const string QuickplayWaitingKey = "ui/menu/quickplayWaiting";
 
 	private void Awake()
 	{
@@ -84,13 +93,8 @@ public class NetworkManagerUI : MonoBehaviour
 			return;
 		}
 
-		if (!string.IsNullOrWhiteSpace(gameSceneName) && NetworkManager.Singleton.SceneManager != null)
-		{
-			NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
-		}
-
 		ShowAndFetchHostIp();
-		SetStatus("Hosting game. Waiting for opponent to join...");
+		SetWaitingStatus();
 	}
 
 	private void HideHostIp()
@@ -190,16 +194,26 @@ public class NetworkManagerUI : MonoBehaviour
 		if (statusText == null || NetworkManager.Singleton == null) return;
 
 		// Host: update when any client connects (including our own local client on host),
-		// so the "waiting for opponent" text is not left stale.
 		if (NetworkManager.Singleton.IsHost)
 		{
 			if (clientId == NetworkManager.Singleton.LocalClientId)
 			{
-				SetStatus("Hosting game (local client connected). Waiting for opponent...");
+				// Local host connected; still waiting for an opponent.
+				SetWaitingStatus();
 			}
 			else
 			{
+				// A remote client connected - start the game for everyone.
 				SetStatus("Opponent connected. Starting game!");
+
+				if (waitingSpinner != null)
+					waitingSpinner.SetActive(false);
+
+				if (!string.IsNullOrWhiteSpace(gameSceneName) &&
+				    NetworkManager.Singleton.SceneManager != null)
+				{
+					NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
+				}
 			}
 		}
 		// Pure client (non-host): we successfully connected to the host.
@@ -207,6 +221,61 @@ public class NetworkManagerUI : MonoBehaviour
 		{
 			SetStatus("Connected to host.");
 		}
+	}
+
+	/// <summary>
+	/// Cancel any active host/client session and clear status/IP UI.
+	/// Hook this to a Cancel/Back button alongside your own menu navigation.
+	/// </summary>
+	public void CancelNetworking()
+	{
+		if (NetworkManager.Singleton != null &&
+		    (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient))
+		{
+			NetworkManager.Singleton.Shutdown();
+		}
+
+		SetStatus("");
+		HideHostIp();
+
+		// Restore the default quickplay description key so the panel text is correct next time it opens.
+		ApplyStatusKey(QuickplayDescriptionKey);
+
+		if (waitingSpinner != null)
+			waitingSpinner.SetActive(false);
+	}
+
+	private void SetWaitingStatus()
+	{
+		if (waitingSpinner != null)
+			waitingSpinner.SetActive(true);
+
+		// Prefer localized key-based status if possible.
+		if (!ApplyStatusKey(QuickplayWaitingKey))
+		{
+			// Fallback English string if localization isn't wired.
+			SetStatus("Hosting game. Waiting for opponent.");
+		}
+	}
+
+	/// <summary>
+	/// Try to switch the LocalizedTMPText key on the status label and immediately apply the translated value.
+	/// Returns true if a localized value was applied.
+	/// </summary>
+	private bool ApplyStatusKey(string key)
+	{
+		if (statusLocalized == null || statusText == null)
+			return false;
+
+		statusLocalized.key = key;
+
+		if (LocalizationManager.TryGet(key, LocalizationManager.CurrentLanguageIndex, out var value))
+		{
+			statusText.text = value;
+			return true;
+		}
+
+		return false;
 	}
 
 	private void HandleClientDisconnected(ulong clientId)

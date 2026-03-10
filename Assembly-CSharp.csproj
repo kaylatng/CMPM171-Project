@@ -59,6 +59,7 @@
     <Compile Include="Assets\_Scripts\Networking\DeckClickable.cs" />
     <Compile Include="Assets\_Scripts\UI\CardHover.cs" />
     <Compile Include="Assets\_Scripts\UI\CardHoverVisual.cs" />
+    <Compile Include="Assets\_Scripts\UI\MainMenu\UISpinner.cs" />
     <Compile Include="Assets\_Scripts\Networking\BoardManager.cs" />
     <Compile Include="Assets\_Scripts\UI\NetworkManagerUI.cs" />
     <Compile Include="Assets\_Scripts\UI\CardVisual.cs" />
