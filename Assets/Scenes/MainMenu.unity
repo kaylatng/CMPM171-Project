@@ -290,7 +290,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -0.00024414, y: 0}
+  m_AnchoredPosition: {x: -0.00024414062, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &113004340
@@ -306,7 +306,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.68235296}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.45490196}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -565,7 +565,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 291, y: -83.265015}
+  m_AnchoredPosition: {x: 294.10275, y: -46.16706}
   m_SizeDelta: {x: 485.406, y: 345.38904}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &261178002
@@ -1176,7 +1176,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cfabb0440166ab443bba8876756fdfa9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Shadow
-  m_EffectColor: {r: 0.37647063, g: 0.14509805, b: 0.37254903, a: 1}
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.5294118}
   m_EffectDistance: {x: 0, y: -10}
   m_UseGraphicAlpha: 1
 --- !u!114 &596933226
@@ -1274,7 +1274,6 @@ GameObject:
   - component: {fileID: 686515182}
   - component: {fileID: 686515181}
   - component: {fileID: 686515180}
-  - component: {fileID: 686515184}
   m_Layer: 5
   m_Name: Quit
   m_TagString: Untagged
@@ -1361,8 +1360,8 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 686515184}
-        m_TargetAssemblyTypeName: QuitButton, Assembly-CSharp
+      - m_Target: {fileID: 1051105557}
+        m_TargetAssemblyTypeName: MainMenuController, Assembly-CSharp
         m_MethodName: Quit
         m_Mode: 1
         m_Arguments:
@@ -1411,18 +1410,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 686515178}
   m_CullTransparentMesh: 1
---- !u!114 &686515184
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 686515178}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7616713fbb988c6489d6435e0158a04e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::QuitButton
 --- !u!1 &853587469
 GameObject:
   m_ObjectHideFlags: 0
@@ -1998,6 +1985,52 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1050293448}
   m_CullTransparentMesh: 1
+--- !u!1 &1051105556
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1051105558}
+  - component: {fileID: 1051105557}
+  m_Layer: 0
+  m_Name: MainMenuController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1051105557
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1051105556}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53e9f8d1dd0f2b84b9135debde8e05e0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MainMenuController
+  mainMenuRoot: {fileID: 489669381}
+  onlinePlayPanel: {fileID: 113004338}
+--- !u!4 &1051105558
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1051105556}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 349.0288, y: 298.97934, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1053955733
 GameObject:
   m_ObjectHideFlags: 0
@@ -2096,7 +2129,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1053955737}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1051105557}
+        m_TargetAssemblyTypeName: MainMenuController, Assembly-CSharp
+        m_MethodName: OnBackFromOnlinePlay
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1053955737
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2385,7 +2430,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1310510321}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1051105557}
+        m_TargetAssemblyTypeName: MainMenuController, Assembly-CSharp
+        m_MethodName: OnPlayButton
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1310510321
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2474,7 +2531,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d72d873d9c2a52409a9524e55744d7a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalizedTMPText
-  key: ui/menu/play
+  key: ui/menu/join
   autoKeyFromHierarchyPath: 1
   translations: []
 --- !u!114 &1359978864
@@ -2530,7 +2587,7 @@ MonoBehaviour:
   m_enableAutoSizing: 1
   m_fontSizeMin: 40
   m_fontSizeMax: 90
-  m_fontStyle: 16
+  m_fontStyle: 0
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
   m_textAlignment: 65535
@@ -2626,7 +2683,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d72d873d9c2a52409a9524e55744d7a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalizedTMPText
-  key: ui/menu/quit
+  key: ui/menu/quickplay
   autoKeyFromHierarchyPath: 1
   translations: []
 --- !u!114 &1392852103
@@ -2649,7 +2706,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: quickplay
+  m_text: Quickplay
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 61bc85651c138094181038655e80bcce, type: 2}
   m_sharedMaterial: {fileID: -4283298451182813959, guid: 61bc85651c138094181038655e80bcce, type: 2}
@@ -2932,7 +2989,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -296.00012, y: -83.265015}
+  m_AnchoredPosition: {x: -292.8973, y: -46.16706}
   m_SizeDelta: {x: 485.406, y: 345.38904}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1443197208
@@ -3055,7 +3112,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cfabb0440166ab443bba8876756fdfa9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Shadow
-  m_EffectColor: {r: 0.37647063, g: 0.14509805, b: 0.37254903, a: 1}
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.5294118}
   m_EffectDistance: {x: 0, y: -10}
   m_UseGraphicAlpha: 1
 --- !u!114 &1447198462
@@ -3850,7 +3907,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d72d873d9c2a52409a9524e55744d7a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalizedTMPText
-  key: ui/menu/play
+  key: ui/menu/host
   autoKeyFromHierarchyPath: 1
   translations: []
 --- !u!114 &2053815317
@@ -3906,7 +3963,7 @@ MonoBehaviour:
   m_enableAutoSizing: 1
   m_fontSizeMin: 40
   m_fontSizeMax: 90
-  m_fontStyle: 16
+  m_fontStyle: 0
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
   m_textAlignment: 65535
@@ -3989,7 +4046,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0.000015259, y: 299}
+  m_AnchoredPosition: {x: 0.000015259, y: 313}
   m_SizeDelta: {x: 943.595, y: 142.383}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2090893532
@@ -4355,3 +4412,4 @@ SceneRoots:
   - {fileID: 2124541874}
   - {fileID: 928315152}
   - {fileID: 148646043}
+  - {fileID: 1051105558}

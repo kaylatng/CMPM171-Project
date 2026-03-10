@@ -37,3 +37,15 @@ MonoBehaviour:
     translations:
     - 
     - Volver
+  - key: ui/menu/quickplay
+    translations:
+    - 
+    - "Partida R\xE1pida"
+  - key: ui/menu/host
+    translations:
+    - 
+    - "Anfitri\xF3n"
+  - key: ui/menu/join
+    translations:
+    - 
+    - "\xDAnete"

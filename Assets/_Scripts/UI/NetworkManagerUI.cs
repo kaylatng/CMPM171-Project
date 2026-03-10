@@ -5,6 +5,7 @@ using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
@@ -13,6 +14,9 @@ public class NetworkManagerUI : MonoBehaviour
 	[SerializeField] private Button serverBtn;
 	[SerializeField] private Button hostBtn;
 	[SerializeField] private Button clientBtn;
+
+	[Header("Scenes")]
+	[SerializeField] private string gameSceneName = "MainGame";
 
 	[Header("Host - Your IP (shown only when hosting)")]
 	[Tooltip("Assign a TextMeshProUGUI to show the host's public IP after clicking Host.")]
@@ -57,7 +61,7 @@ public class NetworkManagerUI : MonoBehaviour
 		}
 	}
 
-	private void OnServerClicked()
+	public void OnServerClicked()
 	{
 		HideHostIp();
 		ConfigureServerTransport();
@@ -65,7 +69,7 @@ public class NetworkManagerUI : MonoBehaviour
 		SetStatus("Server running. Waiting for clients...");
 	}
 
-	private void OnHostClicked()
+	public void OnHostClicked()
 	{
 		ConfigureServerTransport();
 		bool success = NetworkManager.Singleton.StartHost();
@@ -73,6 +77,11 @@ public class NetworkManagerUI : MonoBehaviour
 		{
 			SetStatus("Failed to start host.");
 			return;
+		}
+
+		if (!string.IsNullOrWhiteSpace(gameSceneName) && NetworkManager.Singleton.SceneManager != null)
+		{
+			NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
 		}
 
 		ShowAndFetchHostIp();
@@ -107,7 +116,7 @@ public class NetworkManagerUI : MonoBehaviour
 		}
 	}
 
-	private void OnClientClicked()
+	public void OnClientClicked()
 	{
 		string ip = GetClientAddress();
 		ushort port = GetClientPort();
