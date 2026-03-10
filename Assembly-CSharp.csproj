@@ -47,13 +47,15 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.2.9f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.UIToolkit.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\_Scripts\UI\Localization\LocalizationManager.cs" />
     <Compile Include="Assets\_Scripts\UI\CardDraggable.cs" />
-    <Compile Include="Assets\_Scripts\UI\LanguageSwitcher.cs" />
     <Compile Include="Assets\_Scripts\UI\CardShadow.cs" />
     <Compile Include="Assets\_Scripts\Networking\PlayerNetwork.cs" />
     <Compile Include="Assets\_Scripts\Data\CardData.cs" />
+    <Compile Include="Assets\_Scripts\UI\Localization\LocalizationBootstrapper.cs" />
     <Compile Include="Assets\_Scripts\UI\PlayerResourcesUI.cs" />
-    <Compile Include="Assets\_Scripts\UI\LocalizedTMPText.cs" />
+    <Compile Include="Assets\_Scripts\UI\Localization\TranslationTable.cs" />
+    <Compile Include="Assets\_Scripts\UI\MainMenu\LanguageSwitcher.cs" />
     <Compile Include="Assets\_Scripts\Data\BoardSlot.cs" />
     <Compile Include="Assets\_Scripts\Networking\DeckClickable.cs" />
     <Compile Include="Assets\_Scripts\UI\CardHover.cs" />
@@ -61,16 +63,15 @@
     <Compile Include="Assets\_Scripts\Networking\BoardManager.cs" />
     <Compile Include="Assets\_Scripts\UI\NetworkManagerUI.cs" />
     <Compile Include="Assets\_Scripts\UI\CardVisual.cs" />
+    <Compile Include="Assets\_Scripts\UI\MainMenu\QuitButton.cs" />
     <Compile Include="Assets\_Scripts\UI\CardDebugger.cs" />
+    <Compile Include="Assets\_Scripts\UI\Localization\LocalizedTMPText.cs" />
     <Compile Include="Assets\_Scripts\Data\CardManager.cs" />
     <Compile Include="Assets\_Scripts\UI\GameManagerUI.cs" />
     <Compile Include="Assets\_Scripts\UI\CardMergeEffects.cs" />
-    <Compile Include="Assets\_Scripts\UI\LocalizationBootstrapper.cs" />
     <Compile Include="Assets\_Scripts\Networking\GameManager.cs" />
     <Compile Include="Assets\_Scripts\Networking\DeckManager.cs" />
-    <Compile Include="Assets\_Scripts\UI\LocalizationManager.cs" />
     <Compile Include="Assets\_Scripts\Data\CardLibrary.cs" />
-    <Compile Include="Assets\_Scripts\UI\TranslationTable.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\TextMesh Pro\Shaders\TMPro.cginc" />
