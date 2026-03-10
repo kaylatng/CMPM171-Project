@@ -62,6 +62,7 @@
     <Compile Include="Assets\_Scripts\Networking\BoardManager.cs" />
     <Compile Include="Assets\_Scripts\UI\NetworkManagerUI.cs" />
     <Compile Include="Assets\_Scripts\UI\CardVisual.cs" />
+    <Compile Include="Assets\_Scripts\UI\LanQuickPlayController.cs" />
     <Compile Include="Assets\_Scripts\UI\CardDebugger.cs" />
     <Compile Include="Assets\_Scripts\UI\Localization\LocalizedTMPText.cs" />
     <Compile Include="Assets\_Scripts\UI\Localization\LanguageSwitcher.cs" />

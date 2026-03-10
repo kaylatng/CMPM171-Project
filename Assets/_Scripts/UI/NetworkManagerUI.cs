@@ -36,9 +36,14 @@ public class NetworkManagerUI : MonoBehaviour
 
 	private void Awake()
 	{
-		serverBtn.onClick.AddListener(OnServerClicked);
-		hostBtn.onClick.AddListener(OnHostClicked);
-		clientBtn.onClick.AddListener(OnClientClicked);
+		if (serverBtn != null)
+			serverBtn.onClick.AddListener(OnServerClicked);
+
+		if (hostBtn != null)
+			hostBtn.onClick.AddListener(OnHostClicked);
+
+		if (clientBtn != null)
+			clientBtn.onClick.AddListener(OnClientClicked);
 		if (hostPublicIpText != null)
 			hostPublicIpText.gameObject.SetActive(false);
 
@@ -136,6 +141,20 @@ public class NetworkManagerUI : MonoBehaviour
 		{
 			// client started; connection result will be reflected via callbacks
 		}
+	}
+
+	/// <summary>
+	/// Connect as a client to a specific IPv4 address (used by LAN Quick Play).
+	/// </summary>
+	/// <param name="ip">Host IPv4 address (e.g. 192.168.1.10).</param>
+	public void ConnectToIp(string ip)
+	{
+		if (ipAddressInputField != null)
+		{
+			ipAddressInputField.text = ip;
+		}
+
+		OnClientClicked();
 	}
 
 	private string GetClientAddress()
