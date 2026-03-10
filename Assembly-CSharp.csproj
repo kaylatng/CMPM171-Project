@@ -55,7 +55,6 @@
     <Compile Include="Assets\_Scripts\UI\Localization\LocalizationBootstrapper.cs" />
     <Compile Include="Assets\_Scripts\UI\PlayerResourcesUI.cs" />
     <Compile Include="Assets\_Scripts\UI\Localization\TranslationTable.cs" />
-    <Compile Include="Assets\_Scripts\UI\MainMenu\LanguageSwitcher.cs" />
     <Compile Include="Assets\_Scripts\Data\BoardSlot.cs" />
     <Compile Include="Assets\_Scripts\Networking\DeckClickable.cs" />
     <Compile Include="Assets\_Scripts\UI\CardHover.cs" />
@@ -66,6 +65,7 @@
     <Compile Include="Assets\_Scripts\UI\MainMenu\QuitButton.cs" />
     <Compile Include="Assets\_Scripts\UI\CardDebugger.cs" />
     <Compile Include="Assets\_Scripts\UI\Localization\LocalizedTMPText.cs" />
+    <Compile Include="Assets\_Scripts\UI\Localization\LanguageSwitcher.cs" />
     <Compile Include="Assets\_Scripts\Data\CardManager.cs" />
     <Compile Include="Assets\_Scripts\UI\GameManagerUI.cs" />
     <Compile Include="Assets\_Scripts\UI\CardMergeEffects.cs" />

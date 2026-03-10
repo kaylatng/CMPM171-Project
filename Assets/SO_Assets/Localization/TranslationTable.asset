@@ -33,3 +33,7 @@ MonoBehaviour:
     translations:
     - 
     - Tutorial
+  - key: ui/menu/back
+    translations:
+    - 
+    - Volver
