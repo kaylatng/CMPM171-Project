@@ -263,9 +263,9 @@ SpriteRenderer:
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
   m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingLayerID: 352997363
+  m_SortingLayer: 2
+  m_SortingOrder: 10
   m_Sprite: {fileID: 7560894977010240419, guid: 2b522a025ec86834b8abf8563b5df217, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -448,6 +448,7 @@ MonoBehaviour:
   shadowOffset: {x: 0.1, y: -0.1, z: 0.01}
   dragShadowOffset: {x: 0.15, y: -0.15, z: 0.01}
   shadowScale: {x: 1, y: 1, z: 1}
+  shadowSortingOffset: -1
   interpolationSpeed: 8
   dragInterpolationSpeed: 4
   showInHand: 1
