@@ -133,13 +133,24 @@ public class CardVisual : MonoBehaviour
             faceRenderer.sortingOrder = baseOrder + 1;
         }
 
+        // Keep glint aligned with hover sorting so it doesn't get stuck at prefab order.
+        // Target: above face, below frame.
+        SpriteRenderer glintSr = null;
+        Transform glintT = transform.Find("TiltPivot/Glint");
+        if (glintT != null) glintSr = glintT.GetComponent<SpriteRenderer>();
+        if (glintSr != null)
+        {
+            if (cardRenderer != null) glintSr.sortingLayerID = cardRenderer.sortingLayerID;
+            glintSr.sortingOrder = baseOrder + 2;
+        }
+
         if (frameRenderer != null)
         {
             if (cardRenderer != null)
             {
                 frameRenderer.sortingLayerID = cardRenderer.sortingLayerID;
             }
-            frameRenderer.sortingOrder = baseOrder + 2;
+            frameRenderer.sortingOrder = baseOrder + 3;
         }
 
         if (chargeStars != null)
@@ -152,7 +163,7 @@ public class CardVisual : MonoBehaviour
                     {
                         chargeStars[i].sortingLayerID = cardRenderer.sortingLayerID;
                     }
-                    chargeStars[i].sortingOrder = baseOrder + 3;
+                    chargeStars[i].sortingOrder = baseOrder + 4;
                 }
             }
         }
@@ -168,7 +179,7 @@ public class CardVisual : MonoBehaviour
             SpriteRenderer sr = star.GetComponentInChildren<SpriteRenderer>();
             if (sr == null) continue;
             if (cardRenderer != null) sr.sortingLayerID = cardRenderer.sortingLayerID;
-            sr.sortingOrder = baseOrder + 3;
+            sr.sortingOrder = baseOrder + 4;
         }
     }
 
@@ -294,6 +305,8 @@ public class CardVisual : MonoBehaviour
         {
             if (faceRenderer != null) faceRenderer.enabled = false;
             if (frameRenderer != null) frameRenderer.enabled = false;
+            var glintSr = transform.Find("TiltPivot/Glint")?.GetComponent<SpriteRenderer>();
+            if (glintSr != null) glintSr.enabled = false;
             // Hide prefab "Square" child so its white sprite doesn't render over the card back
             var squareChild = transform.Find("Square");
             if (squareChild != null)
@@ -315,6 +328,8 @@ public class CardVisual : MonoBehaviour
         {
             if (faceRenderer != null) faceRenderer.enabled = true;
             if (frameRenderer != null) frameRenderer.enabled = !hideFrameAndStars;
+            var glintSr = transform.Find("TiltPivot/Glint")?.GetComponent<SpriteRenderer>();
+            if (glintSr != null) glintSr.enabled = true;
             // Re-enable prefab "Square" child when face-up (e.g. after reveal)
             var squareChild = transform.Find("Square");
             if (squareChild != null)
