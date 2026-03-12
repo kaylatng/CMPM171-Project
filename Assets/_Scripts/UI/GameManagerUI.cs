@@ -2,6 +2,9 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using Unity.Netcode;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 public class GameManagerUI : MonoBehaviour
 {
@@ -17,7 +20,31 @@ public class GameManagerUI : MonoBehaviour
 	[SerializeField] private TextMeshProUGUI phasePanelText;
 	[SerializeField, Tooltip("If > 0, phase panel will auto-hide after this many seconds.")]
 	private float phasePanelAutoHideSeconds = 0f;
-	private Coroutine phasePanelHideRoutine;
+	[SerializeField] private float phasePanelEnterDuration = 0.35f;
+	[SerializeField] private float phasePanelExitDuration = 0.35f;
+	[SerializeField] private float phaseTextEnterDuration = 0.25f;
+	[SerializeField] private float phaseTextExitDuration = 0.25f;
+	[SerializeField, Tooltip("Extra distance beyond the screen edge (pixels).")]
+	private float phasePanelOffscreenPadding = 60f;
+	
+	[Header("Debug (Phase Panel)")]
+	[SerializeField] private bool enablePhasePanelDebugToggle = false;
+#if ENABLE_INPUT_SYSTEM
+	[SerializeField] private Key phasePanelDebugToggleKey = Key.Space;
+#else
+	[SerializeField] private KeyCode phasePanelDebugToggleKey = KeyCode.Space;
+#endif
+	[SerializeField, Tooltip("How long the panel stays on-screen in the debug one-shot animation.")]
+	private float phasePanelDebugHoldSeconds = 0.75f;
+	private Coroutine phasePanelDebugRoutine;
+
+	private Coroutine phasePanelAutoHideRoutine;
+	private Coroutine phasePanelTweenRoutine;
+	private Coroutine phaseTextTweenRoutine;
+	private RectTransform phasePanelRect;
+	private RectTransform phaseCanvasRect;
+	private Vector2 phasePanelRestAnchoredPos;
+	private bool phasePanelRestPosCached;
 	
 	[Header("Resource Display")]
 	[SerializeField] private TextMeshProUGUI apText;
@@ -71,7 +98,8 @@ public class GameManagerUI : MonoBehaviour
 		UpdateReadyButton(false);
 		if (phasePanel != null)
 		{
-			// Ensure it starts visible only if we have a phase to show; UpdatePhaseUI will toggle.
+			CachePhasePanelRectsIfNeeded();
+			// Ensure it starts hidden; UpdatePhaseUI will animate it in.
 			phasePanel.SetActive(false);
 		}
 		if (opponentReadyIndicator != null)
@@ -106,6 +134,18 @@ public class GameManagerUI : MonoBehaviour
 
 		// check opponent ready status
 		CheckOpponentStatus();
+
+		if (enablePhasePanelDebugToggle)
+		{
+#if ENABLE_INPUT_SYSTEM
+			var kb = Keyboard.current;
+			if (kb != null && kb[phasePanelDebugToggleKey].wasPressedThisFrame)
+				PlayPhasePanelDebugOnce();
+#else
+			if (Input.GetKeyDown(phasePanelDebugToggleKey))
+				PlayPhasePanelDebugOnce();
+#endif
+		}
 	}
 
 	private void OnResetButtonClicked()
@@ -196,13 +236,13 @@ public class GameManagerUI : MonoBehaviour
 
 		if (phasePanel != null)
 		{
-			phasePanel.SetActive(true);
+			PlayPhasePanelEnter();
 		}
 
-		if (phasePanelHideRoutine != null)
+		if (phasePanelAutoHideRoutine != null)
 		{
-			StopCoroutine(phasePanelHideRoutine);
-			phasePanelHideRoutine = null;
+			StopCoroutine(phasePanelAutoHideRoutine);
+			phasePanelAutoHideRoutine = null;
 		}
 
 		switch (phase)
@@ -228,16 +268,253 @@ public class GameManagerUI : MonoBehaviour
 		// If you're using the panel, optionally auto-hide it.
 		if (phasePanel != null && phasePanelAutoHideSeconds > 0f)
 		{
-			phasePanelHideRoutine = StartCoroutine(HidePhasePanelAfterDelay(phasePanelAutoHideSeconds));
+			phasePanelAutoHideRoutine = StartCoroutine(HidePhasePanelAfterDelay(phasePanelAutoHideSeconds));
 		}
 	}
 
 	private System.Collections.IEnumerator HidePhasePanelAfterDelay(float seconds)
 	{
 		yield return new WaitForSeconds(seconds);
-		if (phasePanel != null)
-			phasePanel.SetActive(false);
-		phasePanelHideRoutine = null;
+		PlayPhasePanelExit();
+		phasePanelAutoHideRoutine = null;
+	}
+	
+	private void PlayPhasePanelDebugOnce()
+	{
+		if (phasePanel == null) return;
+		if (phasePanelDebugRoutine != null)
+		{
+			StopCoroutine(phasePanelDebugRoutine);
+			phasePanelDebugRoutine = null;
+		}
+
+		if (phasePanelAutoHideRoutine != null)
+		{
+			StopCoroutine(phasePanelAutoHideRoutine);
+			phasePanelAutoHideRoutine = null;
+		}
+
+		// Ensure we have something visible on the panel in debug mode.
+		if (phasePanelText != null)
+		{
+			phasePanelText.text = "Phase";
+			phasePanelText.color = Color.white;
+		}
+		else if (phaseText != null)
+		{
+			phaseText.text = "Phase";
+			phaseText.color = Color.white;
+		}
+		
+		phasePanelDebugRoutine = StartCoroutine(PlayPhasePanelDebugSequence());
+	}
+
+	private System.Collections.IEnumerator PlayPhasePanelDebugSequence()
+	{
+		PlayPhasePanelEnter();
+		yield return new WaitForSeconds(Mathf.Max(0.01f, phasePanelEnterDuration));
+		yield return new WaitForSeconds(Mathf.Max(0f, phasePanelDebugHoldSeconds));
+		PlayPhasePanelExit();
+		yield return new WaitForSeconds(Mathf.Max(0.01f, phasePanelExitDuration));
+		phasePanelDebugRoutine = null;
+	}
+
+	private void CachePhasePanelRectsIfNeeded()
+	{
+		if (phasePanel == null) return;
+		if (phasePanelRect == null)
+			phasePanelRect = phasePanel.GetComponent<RectTransform>();
+		if (phasePanelRect == null) return;
+
+		if (!phasePanelRestPosCached)
+		{
+			phasePanelRestAnchoredPos = phasePanelRect.anchoredPosition;
+			phasePanelRestPosCached = true;
+		}
+
+		if (phaseCanvasRect == null)
+		{
+			var canvas = phasePanelRect.GetComponentInParent<Canvas>();
+			if (canvas != null)
+				phaseCanvasRect = canvas.transform as RectTransform;
+		}
+	}
+
+	private float GetCanvasWidth()
+	{
+		if (phaseCanvasRect != null)
+			return phaseCanvasRect.rect.width;
+		return Screen.width;
+	}
+
+	private Vector2 GetOffscreenLeftPos()
+	{
+		CachePhasePanelRectsIfNeeded();
+		if (phasePanelRect == null) return Vector2.zero;
+		float canvasWidth = GetCanvasWidth();
+		float panelWidth = phasePanelRect.rect.width;
+		float offset = (canvasWidth * 0.5f) + (panelWidth * 0.5f) + phasePanelOffscreenPadding;
+		return new Vector2(phasePanelRestAnchoredPos.x - offset, phasePanelRestAnchoredPos.y);
+	}
+
+	private Vector2 GetOffscreenRightPos()
+	{
+		CachePhasePanelRectsIfNeeded();
+		if (phasePanelRect == null) return Vector2.zero;
+		float canvasWidth = GetCanvasWidth();
+		float panelWidth = phasePanelRect.rect.width;
+		float offset = (canvasWidth * 0.5f) + (panelWidth * 0.5f) + phasePanelOffscreenPadding;
+		return new Vector2(phasePanelRestAnchoredPos.x + offset, phasePanelRestAnchoredPos.y);
+	}
+
+	private void PlayPhasePanelEnter()
+	{
+		if (phasePanel == null) return;
+		CachePhasePanelRectsIfNeeded();
+		if (phasePanelRect == null) return;
+
+		phasePanel.SetActive(true);
+
+		if (phasePanelTweenRoutine != null)
+			StopCoroutine(phasePanelTweenRoutine);
+		if (phaseTextTweenRoutine != null)
+			StopCoroutine(phaseTextTweenRoutine);
+
+		phasePanelRect.anchoredPosition = GetOffscreenLeftPos();
+		phasePanelTweenRoutine = StartCoroutine(TweenAnchoredPos(
+			phasePanelRect,
+			GetOffscreenLeftPos(),
+			phasePanelRestAnchoredPos,
+			Mathf.Max(0.01f, phasePanelEnterDuration),
+			EaseOutCubic,
+			onComplete: () => phasePanelTweenRoutine = null
+		));
+
+		if (phasePanelText != null)
+		{
+			var rt = phasePanelText.rectTransform;
+			rt.localScale = new Vector3(1f, 1f, 1f);
+			phaseTextTweenRoutine = StartCoroutine(TweenScale(
+				rt,
+				new Vector3(4f, 0.3f, 1f),
+				Vector3.one,
+				Mathf.Max(0.01f, phaseTextEnterDuration),
+				EaseOutCubic,
+				onComplete: () => phaseTextTweenRoutine = null
+			));
+		}
+	}
+
+	private void PlayPhasePanelExit()
+	{
+		if (phasePanel == null) return;
+		CachePhasePanelRectsIfNeeded();
+		if (phasePanelRect == null) return;
+
+		if (phasePanelTweenRoutine != null)
+			StopCoroutine(phasePanelTweenRoutine);
+		if (phaseTextTweenRoutine != null)
+			StopCoroutine(phaseTextTweenRoutine);
+
+		Vector2 startPos = phasePanelRect.anchoredPosition;
+		Vector2 endPos = GetOffscreenRightPos();
+
+		phasePanelTweenRoutine = StartCoroutine(TweenAnchoredPos(
+			phasePanelRect,
+			startPos,
+			endPos,
+			Mathf.Max(0.01f, phasePanelExitDuration),
+			EaseInCubic,
+			onComplete: () =>
+			{
+				phasePanelTweenRoutine = null;
+				if (phasePanel != null)
+					phasePanel.SetActive(false);
+			}
+		));
+
+		if (phasePanelText != null)
+		{
+			var rt = phasePanelText.rectTransform;
+			Vector3 startScale = rt.localScale;
+			// Exit: stretch wide and squash short.
+			Vector3 endScale = new Vector3(4f, 0.3f, 1f);
+			phaseTextTweenRoutine = StartCoroutine(TweenScale(
+				rt,
+				startScale,
+				endScale,
+				Mathf.Max(0.01f, phaseTextExitDuration),
+				EaseInCubic,
+				onComplete: () => phaseTextTweenRoutine = null
+			));
+		}
+	}
+
+	private static System.Collections.IEnumerator TweenAnchoredPos(
+		RectTransform rect,
+		Vector2 from,
+		Vector2 to,
+		float duration,
+		System.Func<float, float> easing,
+		System.Action onComplete)
+	{
+		if (rect == null) yield break;
+		float t = 0f;
+		while (t < duration)
+		{
+			t += Time.deltaTime;
+			float u = Mathf.Clamp01(t / duration);
+			float e = easing != null ? easing(u) : u;
+			rect.anchoredPosition = Vector2.LerpUnclamped(from, to, e);
+			yield return null;
+		}
+		rect.anchoredPosition = to;
+		onComplete?.Invoke();
+	}
+
+	private static System.Collections.IEnumerator TweenScale(
+		Transform tr,
+		Vector3 from,
+		Vector3 to,
+		float duration,
+		System.Func<float, float> easing,
+		System.Action onComplete)
+	{
+		if (tr == null) yield break;
+		float t = 0f;
+		while (t < duration)
+		{
+			t += Time.deltaTime;
+			float u = Mathf.Clamp01(t / duration);
+			float e = easing != null ? easing(u) : u;
+			tr.localScale = Vector3.LerpUnclamped(from, to, e);
+			yield return null;
+		}
+		tr.localScale = to;
+		onComplete?.Invoke();
+	}
+
+	private static float EaseOutCubic(float t)
+	{
+		t = Mathf.Clamp01(t);
+		float p = 1f - t;
+		return 1f - (p * p * p);
+	}
+
+	private static float EaseInCubic(float t)
+	{
+		t = Mathf.Clamp01(t);
+		return t * t * t;
+	}
+
+	// A gentle overshoot for the "squash to normal" text entrance.
+	private static float EaseOutBack(float t)
+	{
+		t = Mathf.Clamp01(t);
+		const float c1 = 1.70158f;
+		const float c3 = c1 + 1f;
+		float p = t - 1f;
+		return 1f + c3 * (p * p * p) + c1 * (p * p);
 	}
 
 	private void UpdateRoundUI(int round)
