@@ -9,7 +9,7 @@ public class PlayerNetwork : NetworkBehaviour {
 
 	private NetworkVariable<PlayerData> playerData = new NetworkVariable<PlayerData>(
 		new PlayerData {
-			Health = 20, // changed from 20 to 5
+			Health = 10, // changed from 20 to 5
 			Mana = 0,
 			ActionPoints = 5,
 			IsReady = false,
@@ -222,7 +222,7 @@ public class PlayerNetwork : NetworkBehaviour {
 	public void ResetPlayerStateServer() {
 		if (!IsServer) return;
 		PlayerData data = new PlayerData {
-			Health = 20,
+			Health = 10,
 			Mana = 0,
 			ActionPoints = 5,
 			IsReady = false,

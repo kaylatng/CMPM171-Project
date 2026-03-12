@@ -183,7 +183,7 @@ public class GameManagerUI : MonoBehaviour
 			readyBtn.interactable = false;
 			if (readyBtnText != null)
 			{
-				readyBtnText.text = "READY ✓";
+				readyBtnText.text = "READY";
 			}
 		} else {
 			readyBtn.interactable = true;
@@ -249,19 +249,19 @@ public class GameManagerUI : MonoBehaviour
 		{
 			case GameManager.GamePhase.ResourceGain:
 				targetText.text = "Phase: Resource Gain";
-				targetText.color = Color.cyan;
+				// targetText.color = Color.cyan;
 				break;
 			case GameManager.GamePhase.Planning:
 				targetText.text = "Phase: Planning";
-				targetText.color = Color.green;
+				// targetText.color = Color.green;
 				break;
 			case GameManager.GamePhase.Reveal:
 				targetText.text = "Phase: Reveal";
-				targetText.color = Color.yellow;
+				// targetText.color = Color.yellow;
 				break;
 			case GameManager.GamePhase.Cleanup:
 				targetText.text = "Phase: Cleanup";
-				targetText.color = Color.white;
+				// targetText.color = Color.white;
 				break;
 		}
 
@@ -542,20 +542,21 @@ public class GameManagerUI : MonoBehaviour
 
 					if (opponentStatusText != null)
 					{
-						opponentStatusText.text = opponentReady ? "Opponent: Ready ✓" : "Opponent: Planning...";
+						opponentStatusText.text = opponentReady ? "Now Waiting..." : "Now Planning...";
 					}
 
 					// Update opponent HP display
 					if (opponentHpText != null)
 					{
 						int oppHp = opponentPlayer.GetCurrentHealth();
-						opponentHpText.text = $"Opponent HP: {oppHp}/20";
-						if (oppHp <= 5)
-							opponentHpText.color = Color.red;
-						else if (oppHp <= 10)
-							opponentHpText.color = Color.yellow;
-						else
-							opponentHpText.color = Color.white;
+						opponentHpText.text = $"{oppHp}/10";
+						// if (oppHp <= 5)
+						// 	opponentHpText.color = Color.red;
+						// else if (oppHp <= 10)
+						// 	opponentHpText.color = Color.yellow;
+						// else
+						// 	opponentHpText.color = Color.white;
+						opponentHpText.color = Color.white;
 					}
 					return;
 				}
@@ -569,7 +570,7 @@ public class GameManagerUI : MonoBehaviour
 		}
 		if (opponentHpText != null)
 		{
-			opponentHpText.text = "Opponent HP: --";
+			opponentHpText.text = "--";
 			opponentHpText.color = Color.white;
 		}
 	}
@@ -604,7 +605,7 @@ public class GameManagerUI : MonoBehaviour
 	{
 		if (apText != null)
 		{
-			apText.text = $"AP: {ap}/5";
+			apText.text = $"{ap}/5";
 			
 			// color code AP display
 			if (ap <= 0)
@@ -625,7 +626,7 @@ public class GameManagerUI : MonoBehaviour
 		}
 
 		if (hpText != null) {
-			hpText.text = $"HP: {health}/20";
+			hpText.text = $"{health}/10";
 			if (health <= 5)
 				hpText.color = Color.red;
 			else if (health <= 10)
@@ -648,9 +649,9 @@ public class GameManagerUI : MonoBehaviour
 	}
 
 	private void HandlePlayerDataChanged(PlayerNetwork.PlayerData data) {
-		if (manaText != null) manaText.text = $"Mana: {localPlayer.GetMana()}";
-		if (apText != null) apText.text = $"AP: {localPlayer.GetAP()}/5";
-		if (hpText != null) hpText.text = $"HP: {localPlayer.GetHP()}";
+		if (manaText != null) manaText.text = $"{localPlayer.GetMana()}";
+		if (apText != null) apText.text = $"{localPlayer.GetAP()}/5";
+		if (hpText != null) hpText.text = $"{localPlayer.GetHP()}/10";
 	}
 
 	public void ShowGameOver(bool isWin)

@@ -1,35 +1,45 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using Unity.Netcode;
 
 public class PlayerResourcesUI : MonoBehaviour
 {
     [Header("Bars (Fill Images only)")]
     [SerializeField] private Image hpFill;
-    [SerializeField] private Image manaFill;
+    [SerializeField] private Image opponentHpFill;
 
     [Header("Pips (in order)")]
     [SerializeField] private List<Image> apPips = new List<Image>();
 
     [Header("Max values (match your game rules)")]
-    [SerializeField] private int maxHP = 20;
-    [SerializeField] private int maxMana = 10;
+    [SerializeField] private int maxHP = 10;
     [SerializeField] private int maxAP = 5;
 
     private PlayerNetwork localPlayer;
+    private PlayerNetwork opponentPlayer;
 
     private void Start()
     {
         FindLocalPlayer();
+        FindOpponentPlayer();
         UpdateAll(); 
     }
 
     private void Update()
     {
-        
         if (localPlayer == null)
         {
             FindLocalPlayer();
+        }
+
+        if (opponentPlayer == null)
+        {
+            FindOpponentPlayer();
+        }
+
+        if (localPlayer == null)
+        {
             return;
         }
 
@@ -39,11 +49,29 @@ public class PlayerResourcesUI : MonoBehaviour
     private void FindLocalPlayer()
     {
         // Find the local client's player object
-        if (Unity.Netcode.NetworkManager.Singleton == null) return;
-        var localObj = Unity.Netcode.NetworkManager.Singleton.LocalClient?.PlayerObject;
+        if (NetworkManager.Singleton == null) return;
+        var localObj = NetworkManager.Singleton.LocalClient?.PlayerObject;
         if (localObj == null) return;
 
         localPlayer = localObj.GetComponent<PlayerNetwork>();
+    }
+
+    private void FindOpponentPlayer()
+    {
+        if (NetworkManager.Singleton == null) return;
+        if (!NetworkManager.Singleton.IsClient) return;
+
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            if (client.ClientId == NetworkManager.Singleton.LocalClientId)
+                continue;
+
+            if (client.PlayerObject != null && client.PlayerObject.TryGetComponent<PlayerNetwork>(out var opponent))
+            {
+                opponentPlayer = opponent;
+                break;
+            }
+        }
     }
 
     private void UpdateAll()
@@ -51,11 +79,11 @@ public class PlayerResourcesUI : MonoBehaviour
         if (localPlayer == null) return;
 
         int hp = localPlayer.GetCurrentHealth();
-        int mana = localPlayer.GetCurrentMana();
         int ap = localPlayer.GetCurrentActionPoints();
+        int opponentHp = opponentPlayer != null ? opponentPlayer.GetCurrentHealth() : 0;
 
         SetBar(hpFill, hp, maxHP);
-        SetBar(manaFill, mana, maxMana);
+        SetBar(opponentHpFill, opponentHp, maxHP);
         SetPips(ap);
     }
 
