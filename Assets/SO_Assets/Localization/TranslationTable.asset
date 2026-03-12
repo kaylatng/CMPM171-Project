@@ -57,3 +57,7 @@ MonoBehaviour:
     translations:
     - 
     - "Juego anfitri\xF3n. Esperando al oponente."
+  - key: ui/menu/joinInput
+    translations:
+    - 
+    - Ingrese la IP del host

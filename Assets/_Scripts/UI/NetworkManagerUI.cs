@@ -34,9 +34,9 @@ public class NetworkManagerUI : MonoBehaviour
 
 	[Header("Direct IP (optional - for Client)")]
 	[Tooltip("Leave empty to use 127.0.0.1 (same machine). Set to host's IP for LAN/internet.")]
-	[SerializeField] private InputField ipAddressInputField;
+	[SerializeField] private TMP_InputField ipAddressInputField;
 	[Tooltip("Leave 0 or empty to use default port 7778.")]
-	[SerializeField] private InputField portInputField;
+	[SerializeField] private TMP_InputField portInputField;
 
 	private const ushort DefaultPort = 7778;
 
