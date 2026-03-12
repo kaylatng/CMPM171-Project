@@ -30,6 +30,12 @@ public class DeckClickable : MonoBehaviour, IPointerClickHandler
 		}
 
 		player.RequestCardDrawServerRpc();
+
+		// Inform tutorial (if active) that the deck has been clicked.
+		if (UITutorialController.Instance != null)
+		{
+			UITutorialController.Instance.NotifyDeckClicked();
+		}
 	}
 
 	public void OnPointerEnter(PointerEventData eventData)

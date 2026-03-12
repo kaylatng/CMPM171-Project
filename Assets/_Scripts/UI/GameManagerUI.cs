@@ -59,33 +59,45 @@ public class GameManagerUI : MonoBehaviour
 
 	[Header("Round Display")]
 	[SerializeField] private TextMeshProUGUI roundText;
-
+	
 	[Header("Reset")]
 	[SerializeField] private Button resetBtn;
+	
+	[Header("Game Over")]
+	[SerializeField] private GameObject gameOverPanel;
+	[SerializeField] private TextMeshProUGUI gameOverText;
 
-[Header("Game Over")]
-[SerializeField] private GameObject gameOverPanel;
-[SerializeField] private TextMeshProUGUI gameOverText;
+	[Header("Tier-Up Popup")]
+	[SerializeField] private TextMeshProUGUI tierUpText;
+	[SerializeField] private float tierUpRiseDistance = 80f;
+	[SerializeField] private float tierUpDuration = 0.6f;
 
-private PlayerNetwork localPlayer;
+	private PlayerNetwork localPlayer;
 
-// cache for AP tweening
-private int lastDisplayedAp = int.MinValue;
-private Coroutine apTweenRoutine;
+	// cache for AP tweening
+	private int lastDisplayedAp = int.MinValue;
+	private Coroutine apTweenRoutine;
 
-// shake/outline feedback for "no AP" attempts
-private RectTransform apTextRect;
-private Vector2 apTextRestPos;
-private bool apTextRestCached;
-private Coroutine apShakeRoutine;
-private Coroutine apOutlineRoutine;
-private Color apOutlineOriginalColor;
+	// shake/outline feedback for "no AP" attempts
+	private RectTransform apTextRect;
+	private Vector2 apTextRestPos;
+	private bool apTextRestCached;
+	private Coroutine apShakeRoutine;
+	private Coroutine apOutlineRoutine;
+	private Color apOutlineOriginalColor;
 
-// HP damage feedback (shake + floating damage text)
-private RectTransform hpTextRect;
-private Vector2 hpTextRestPos;
-private bool hpTextRestCached;
-private Coroutine hpShakeRoutine;
+	// HP damage feedback (shake + floating damage text)
+	private RectTransform hpTextRect;
+	private Vector2 hpTextRestPos;
+	private bool hpTextRestCached;
+	private Coroutine hpShakeRoutine;
+
+	// Tier-Up popup state
+	private RectTransform tierUpRect;
+	private Vector2 tierUpRestPos;
+	private bool tierUpRestCached;
+	private Coroutine tierUpRoutine;
+	private Color tierUpOriginalColor;
 
 	private void Awake()
 	{
@@ -153,6 +165,16 @@ private Coroutine hpShakeRoutine;
 		{
 			gameOverPanel.SetActive(false);
 		}
+
+		// cache Tier-Up popup references
+		if (tierUpText != null)
+		{
+			tierUpRect = tierUpText.rectTransform;
+			tierUpRestPos = tierUpRect.anchoredPosition;
+			tierUpRestCached = true;
+			tierUpOriginalColor = tierUpText.color;
+			tierUpText.gameObject.SetActive(false);
+		}
 	}
 	
 	private void Update()
@@ -215,6 +237,12 @@ private Coroutine hpShakeRoutine;
 
 			localPlayer.FinishTurn();
 			UpdateReadyButton(true);
+
+			// Inform tutorial that Ready was clicked so it can advance/finish.
+			if (UITutorialController.Instance != null)
+			{
+				UITutorialController.Instance.NotifyReadyClicked();
+			}
 		}
 	}
 
@@ -253,6 +281,12 @@ private Coroutine hpShakeRoutine;
 			if (opponentReadyIndicator != null)
 			{
 				opponentReadyIndicator.SetActive(false);
+			}
+
+			// Inform tutorial about entering a Planning phase (used for one-time merge tip).
+			if (UITutorialController.Instance != null)
+			{
+				UITutorialController.Instance.NotifyPlanningPhaseStarted();
 			}
 		}
 
@@ -893,6 +927,117 @@ private Coroutine hpShakeRoutine;
 		if (manaText != null) manaText.text = $"{localPlayer.GetMana()}";
 		if (apText != null) apText.text = $"{localPlayer.GetAP()}/5";
 		if (hpText != null) hpText.text = $"{localPlayer.GetHP()}/10";
+	}
+
+	/// <summary>
+	/// Play the Tier-Up popup at the top-left of the given card: text rises and fades out.
+	/// </summary>
+	public void PlayTierUpPopup(Transform cardTransform)
+	{
+		if (tierUpText == null || cardTransform == null)
+			return;
+
+		if (!tierUpRestCached)
+		{
+			tierUpRect = tierUpText.rectTransform;
+			tierUpRestPos = tierUpRect.anchoredPosition;
+			tierUpRestCached = true;
+		}
+
+		if (tierUpRoutine != null)
+		{
+			StopCoroutine(tierUpRoutine);
+			tierUpRoutine = null;
+		}
+
+		// Position the popup near the card (top-left corner in screen space).
+		Camera cam = Camera.main;
+		if (cam != null)
+		{
+			// Try to use the card's sprite bounds for a precise corner.
+			Vector3 worldAnchor = cardTransform.position;
+			SpriteRenderer cardSr = cardTransform.GetComponent<SpriteRenderer>();
+			if (cardSr != null)
+			{
+				Bounds b = cardSr.bounds;
+				worldAnchor = new Vector3(b.min.x, b.max.y, b.center.z);
+			}
+
+			Vector3 screenPos = cam.WorldToScreenPoint(worldAnchor);
+
+			// Convert to anchored position on the TierUp text's canvas.
+			var canvas = tierUpText.canvas;
+			if (canvas != null && canvas.renderMode != RenderMode.WorldSpace)
+			{
+				RectTransform canvasRect = canvas.transform as RectTransform;
+				if (canvasRect != null)
+				{
+					Vector2 localPoint;
+					if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+							canvasRect,
+							screenPos,
+							canvas.renderMode == RenderMode.ScreenSpaceCamera ? cam : null,
+							out localPoint))
+					{
+						tierUpRect.anchoredPosition = localPoint;
+					}
+				}
+			}
+			else
+			{
+				// Fallback: use the cached rest position.
+				tierUpRect.anchoredPosition = tierUpRestPos;
+			}
+		}
+		else if (tierUpRect != null)
+		{
+			tierUpRect.anchoredPosition = tierUpRestPos;
+		}
+
+		tierUpText.text = "Tier-Up!";
+		tierUpText.gameObject.SetActive(true);
+
+		Color c = tierUpOriginalColor;
+		if (c == default)
+			c = tierUpText.color;
+		c.a = 1f;
+		tierUpText.color = c;
+
+		tierUpRoutine = StartCoroutine(PlayTierUpPopupRoutine());
+	}
+
+	private System.Collections.IEnumerator PlayTierUpPopupRoutine()
+	{
+		if (tierUpRect == null || !tierUpRestCached)
+			yield break;
+
+		float duration = Mathf.Max(0.01f, tierUpDuration);
+		float elapsed = 0f;
+
+		Vector2 startPos = tierUpRestPos;
+		Vector2 endPos = startPos + new Vector2(0f, tierUpRiseDistance);
+
+		Color baseColor = tierUpText.color;
+		while (elapsed < duration)
+		{
+			elapsed += Time.deltaTime;
+			float t = Mathf.Clamp01(elapsed / duration);
+			float eased = EaseOutCubic(t);
+
+			tierUpRect.anchoredPosition = Vector2.Lerp(startPos, endPos, eased);
+
+			Color c = baseColor;
+			c.a = 1f - t;
+			tierUpText.color = c;
+
+			yield return null;
+		}
+
+		tierUpRect.anchoredPosition = tierUpRestPos;
+		tierUpText.color = tierUpOriginalColor != default ? tierUpOriginalColor : baseColor;
+		tierUpText.gameObject.SetActive(false);
+
+		tierUpRoutine = null;
 	}
 
 	public void ShowGameOver(bool isWin)

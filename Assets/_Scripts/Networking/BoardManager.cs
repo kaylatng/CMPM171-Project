@@ -678,6 +678,12 @@ public class BoardManager : MonoBehaviour
                 SFXManager.Instance.PlayCardUpgrade();
             }
 
+            // Tier-Up UI feedback for the local player's merges
+            if (isPlayerBoard && GameManagerUI.Instance != null)
+            {
+                GameManagerUI.Instance.PlayTierUpPopup(targetCard.transform);
+            }
+
 			// Tell the server about the new tier + max charges so damage/charges are authoritative
 			if (isPlayerBoard && Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsClient)
 			{

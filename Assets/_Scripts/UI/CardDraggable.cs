@@ -81,6 +81,12 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         // Toggle Attack (Planning Phase only): first tap = set attack intent + tilt, second tap = undo
         if (isOnBoard && GameManager.Instance != null && GameManager.Instance.CanAttack())
         {
+            // Inform tutorial that the player tapped a board card to attack.
+            if (UITutorialController.Instance != null)
+            {
+                UITutorialController.Instance.NotifyBoardCardTappedForAttack();
+            }
+
             if (isAttacking)
             {
                 SetAttackIntent(false);
@@ -317,6 +323,9 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     {
         if (BoardManager.Instance == null) return false;
 
+        // Remember whether this card started in the player hand before placing.
+        bool fromPlayerHand = originalParent != null && originalParent.name == "PlayerHandZone";
+
         if (!CanBePlayed())
         {
             ShowCannotPlayFeedback();
@@ -332,6 +341,12 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             if (CardManager.Instance != null)
             {
                 CardManager.Instance.RemoveCardFromHand(gameObject);
+            }
+
+            // Inform tutorial (if active) that a card from hand has been placed on the player board.
+            if (UITutorialController.Instance != null)
+            {
+                UITutorialController.Instance.NotifyCardPlacedOnPlayerBoardFromHand(gameObject, fromPlayerHand);
             }
         }
 
