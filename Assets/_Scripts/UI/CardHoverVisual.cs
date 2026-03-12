@@ -22,9 +22,12 @@ public class CardHover25DVisual : MonoBehaviour
     [Header("Glint")]
     public Transform glintTransform;
     public SpriteRenderer glintRenderer;
-    public float glintTravel = 0.8f;
-    public float glintSpeed = 1.2f;
     public float glintAlpha = 0.35f;
+    public float glintDuration = 0.35f;
+    public float glintStartX = -0.45f;
+    public float glintEndX = 0.45f;
+    public float glintY = 0f;
+    public bool playGlintOncePerHover = true;
 
     [Header("Idle Wobble")]
     public bool idleWobble = true;
@@ -32,15 +35,19 @@ public class CardHover25DVisual : MonoBehaviour
     public float wobbleSpeed = 2.5f;
     public float wobbleRamp = 10f;
 
+    // Other Variables
     private float wobbleWeight = 0f;
 
-    Vector3 pos0;
-    Vector3 scale0;
+    private Vector3 rootScale0;
+    private Vector3 tiltPos0;
+    private Vector3 glintPos0;
 
-    bool hovering;
-    Vector2 p01 = new Vector2(0.5f, 0.5f);
-    float glintT;
-    Vector3 glintPos0;
+    private bool hovering;
+    private Vector2 p01 = new Vector2(0.5f, 0.5f);
+
+    private bool glintPlaying = false;
+    private float glintTimer = 0f;
+    private bool glintPlayedThisHover = false;
 
     void Awake()
     {
@@ -50,8 +57,8 @@ public class CardHover25DVisual : MonoBehaviour
         if (!cardRoot) cardRoot = transform;
         if (!tiltPivot) tiltPivot = cardRoot;
 
-        pos0 = cardRoot.localPosition;
-        scale0 = cardRoot.localScale;
+        rootScale0 = cardRoot.localScale;
+        tiltPos0 = tiltPivot.localPosition;
 
         if (glintRenderer == null && glintTransform != null)
             glintRenderer = glintTransform.GetComponent<SpriteRenderer>();
@@ -85,11 +92,36 @@ public class CardHover25DVisual : MonoBehaviour
         if (onlyWhenOnBoard && draggable != null && !draggable.IsOnBoard) return;
 
         hovering = true;
+
+        if (glintTransform != null && glintRenderer != null)
+        {
+            if (!playGlintOncePerHover || !glintPlayedThisHover)
+            {
+                glintPlaying = true;
+                glintTimer = 0f;
+                glintPlayedThisHover = true;
+
+                glintTransform.localPosition = glintPos0 + new Vector3(glintStartX, glintY, 0f);
+                glintTransform.localRotation = Quaternion.Euler(0f, 0f, -8f);
+                SetGlintAlpha(glintAlpha);
+            }
+        }
     }
 
     void Exit()
     {
         hovering = false;
+        glintPlaying = false;
+        glintTimer = 0f;
+        glintPlayedThisHover = false;
+
+        if (glintTransform != null)
+        {
+            glintTransform.localPosition = glintPos0;
+            glintTransform.localRotation = Quaternion.Euler(0f, 0f, -8f);
+        }
+
+        SetGlintAlpha(0f);
     }
 
     void Move01(Vector2 v) => p01 = v;
@@ -100,19 +132,12 @@ public class CardHover25DVisual : MonoBehaviour
             && (draggable == null || !draggable.IsDragging)
             && (!onlyWhenOnBoard || draggable == null || draggable.IsOnBoard);
 
-        // When we're not actively hovering this frame, treat the current
-        // local position as the new baseline so external layout (e.g.,
-        // BoardSlot / BoardManager) can fully control where the card lives.
-        if (!active)
-        {
-            pos0 = cardRoot.localPosition;
-        }
-
         Vector2 p = (p01 * 2f) - Vector2.one;
 
         float tScale = active ? hoverScale : 1f;
-        Vector3 targetScale = scale0 * tScale;
-        Vector3 targetPos = pos0 + (active ? new Vector3(0f, liftWorld, 0f) : Vector3.zero);
+        Vector3 targetScale = rootScale0 * tScale;
+
+        Vector3 targetTiltPos = tiltPos0 + (active ? new Vector3(0f, liftWorld, 0f) : Vector3.zero);
 
         float targetWeight = (active && idleWobble) ? 1f : 0f;
         wobbleWeight = Mathf.Lerp(wobbleWeight, targetWeight, Time.deltaTime * wobbleRamp);
@@ -126,22 +151,36 @@ public class CardHover25DVisual : MonoBehaviour
         Quaternion targetRot = Quaternion.Euler(tiltX, tiltY, 0f);
 
         cardRoot.localScale = Vector3.Lerp(cardRoot.localScale, targetScale, Time.deltaTime * smooth);
-        cardRoot.localPosition = Vector3.Lerp(cardRoot.localPosition, targetPos, Time.deltaTime * smooth);
+        tiltPivot.localPosition = Vector3.Lerp(tiltPivot.localPosition, targetTiltPos, Time.deltaTime * smooth);
         tiltPivot.localRotation = Quaternion.Slerp(tiltPivot.localRotation, targetRot, Time.deltaTime * smooth);
 
         if (glintTransform != null && glintRenderer != null)
         {
-            if (active) glintT += Time.deltaTime * glintSpeed;
-            else glintT = Mathf.Lerp(glintT, 0f, Time.deltaTime * smooth);
+            if (glintPlaying)
+            {
+                glintTimer += Time.deltaTime;
+                float t = Mathf.Clamp01(glintTimer / glintDuration);
 
-            float sweep = Mathf.PingPong(glintT, 1f);
-            float x = Mathf.Lerp(-glintTravel * 0.5f, glintTravel * 0.5f, sweep);
+                float x = Mathf.Lerp(glintStartX, glintEndX, t);
+                glintTransform.localPosition = glintPos0 + new Vector3(x, glintY, 0f);
+                glintTransform.localRotation = Quaternion.Euler(0f, 0f, -8f);
 
-            glintTransform.localRotation = Quaternion.Euler(0, 0, -p.x * 10f);
-            glintTransform.localPosition = glintPos0 + new Vector3(x, 0f, 0f);
+                float fade = 1f;
+                if (t > 0.75f)
+                    fade = Mathf.InverseLerp(1f, 0.75f, t);
 
-            float a = active ? glintAlpha : 0f;
-            SetGlintAlpha(Mathf.Lerp(glintRenderer.color.a, a, Time.deltaTime * smooth));
+                SetGlintAlpha(glintAlpha * fade);
+
+                if (t >= 1f)
+                {
+                    glintPlaying = false;
+                    SetGlintAlpha(0f);
+                }
+            }
+            else
+            {
+                SetGlintAlpha(Mathf.Lerp(glintRenderer.color.a, 0f, Time.deltaTime * smooth));
+            }
         }
     }
 

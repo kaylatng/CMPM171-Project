@@ -30,6 +30,7 @@ public class CardDebugger : MonoBehaviour
         Debug.Log("NO NETWORK CONNECTION NEEDED!");
         Debug.Log("All phase/network/resource checks are DISABLED");
         Debug.Log("Just drag and drop cards freely!");
+        Debug.Log("Children in scene after spawn: " + FindObjectsByType<CardDraggable>(FindObjectsSortMode.None).Length);
         
         // Disable network UI so you don't accidentally click it
         if (disableNetworkManagerUI)
