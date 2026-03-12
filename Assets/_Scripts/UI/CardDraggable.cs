@@ -376,17 +376,11 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
         if (cardVisual == null) return false;
 
+        // Mana is no longer required to play cards; as long as AP and phase checks pass, the card can be played.
         if (CardManager.Instance != null && CardManager.Instance.GetCardLibrary() != null)
         {
             CardData cardData = CardManager.Instance.GetCardLibrary().GetTierOneAssetFromPool(cardVisual.CardID);
             if (cardData == null) return false;
-
-            int currentMana = localPlayer.GetCurrentMana();
-            if (currentMana < cardData.manaCost)
-            {
-                Debug.Log($"CARD DRAGGABLE || Cannot play - not enough mana");
-                return false;
-            }
         }
 
         return true;
@@ -451,7 +445,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         return false;
     }
 
-    /// <summary>Can we turn attack intent ON? Requires 1 Mana, 1 AP (after pending), and >0 charges.</summary>
+    /// <summary>Can we turn attack intent ON? Requires 1 AP (after pending) and >0 charges. Mana no longer required.</summary>
     private bool CanToggleAttackOn()
     {
         if (!isOnBoard || isAttacking) return false;
@@ -461,9 +455,8 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         var localPlayer = Unity.Netcode.NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
         if (localPlayer == null) return false;
         int pending = BoardManager.Instance != null ? BoardManager.Instance.GetLocalPendingAttackCount() : 0;
-        int effectiveMana = localPlayer.GetCurrentMana() - pending;
         int effectiveAP = localPlayer.GetCurrentActionPoints() - pending;
-        if (effectiveMana < 1 || effectiveAP < 1) return false;
+        if (effectiveAP < 1) return false;
         if (cardVisual == null || cardVisual.CurrentCharges <= 0) return false;
         return true;
     }

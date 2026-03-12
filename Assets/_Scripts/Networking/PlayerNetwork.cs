@@ -211,11 +211,11 @@ public class PlayerNetwork : NetworkBehaviour {
 		if (!IsServer) return;
 		PlayerData data = playerData.Value;
 		data.ActionPoints = 5; // reset to 5 AP
-		data.Mana += 1; // gain 1 mana
+		// Mana is no longer required; keep current mana unchanged.
 		data.IsReady = false; // reset ready status
 		playerData.Value = data;
 
-		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} - New turn: 5 AP, {data.Mana} Mana");
+		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} - New turn: 5 AP (mana unchanged)");
 	}
 
 	/// <summary>Server only. Resets this player to initial game state (HP, Mana, AP, ready, hand, board).</summary>
@@ -365,13 +365,7 @@ public class PlayerNetwork : NetworkBehaviour {
 			return;
 		}
 
-		// 3. MANA CHECK (attack costs 1 Mana)
-		if (playerData.Value.Mana < 1) {
-			Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} - Not enough Mana to attack!");
-			return;
-		}
-
-		// 4. SLOT VALIDATION
+		// 3. SLOT VALIDATION (mana no longer required for attacks)
 		if (slotIndex < 0 || slotIndex >= 3) {
 			Debug.Log($"PLAYER NETWORK || Invalid slot index for attack: {slotIndex}");
 			return;
@@ -389,7 +383,6 @@ public class PlayerNetwork : NetworkBehaviour {
 		}
 
 		data.ActionPoints--;
-		data.Mana--;
 		playerData.Value = data;
 
 		if (GameManager.Instance != null) {

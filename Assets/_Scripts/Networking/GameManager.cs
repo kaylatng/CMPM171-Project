@@ -90,7 +90,7 @@ public class GameManager : NetworkBehaviour
 		{
 			if (client.PlayerObject.TryGetComponent<PlayerNetwork>(out var player))
 			{
-				player.StartNewTurnServer(); // reset AP to 5, add +1 mana, set IsReady = false
+				player.StartNewTurnServer(); // reset AP to 5, set IsReady = false (mana unchanged)
 				player.ExecuteDrawServer(isFree: true); // blind draw 1 card (doesn't cost AP)
 			}
 		}

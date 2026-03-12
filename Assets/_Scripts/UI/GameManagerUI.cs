@@ -581,14 +581,16 @@ public class GameManagerUI : MonoBehaviour
 		int mana = player.GetCurrentMana();
 		int health = player.GetCurrentHealth();
 		int pending = GetPendingAttackDeduction();
-		UpdateResourceUI(ap - pending, mana - pending, health);
+		// Pending attacks now only cost AP; mana is not required.
+		UpdateResourceUI(ap - pending, mana, health);
 	}
 
 	/// <summary>Called when server pushes new player data; applies pending attack deduction so display matches intent.</summary>
 	public void OnServerResourceUpdate(int ap, int mana, int health)
 	{
 		int pending = GetPendingAttackDeduction();
-		UpdateResourceUI(ap - pending, mana - pending, health);
+		// Pending attacks now only cost AP; mana is not required.
+		UpdateResourceUI(ap - pending, mana, health);
 	}
 
 	private int GetPendingAttackDeduction()
