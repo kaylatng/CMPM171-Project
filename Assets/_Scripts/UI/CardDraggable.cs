@@ -362,7 +362,30 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     public bool CanBePlayed()
     {
-        if (skipNetworkChecks) return true;
+        // When skipNetworkChecks is true (editor/testing), still enforce AP if we have a live player,
+        // but skip phase/ownership checks so cards remain draggable in offline tests.
+        if (skipNetworkChecks)
+        {
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient)
+            {
+                var lp = NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
+                if (lp != null)
+                {
+                    int pendingAttacksTest = BoardManager.Instance != null ? BoardManager.Instance.GetLocalPendingAttackCount() : 0;
+                    int effectiveApTest = lp.GetCurrentActionPoints() - pendingAttacksTest;
+                    if (effectiveApTest <= 0)
+                    {
+                        Debug.Log("CARD DRAGGABLE || Cannot play (skipNetworkChecks) - no effective AP remaining");
+                        if (GameManagerUI.Instance != null)
+                        {
+                            GameManagerUI.Instance.PlayNoActionPointsFeedback();
+                        }
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
 
         if (GameManager.Instance == null || !GameManager.Instance.CanPlayCards())
         {
@@ -388,9 +411,17 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             return false;
         }
 
-        if (localPlayer.GetCurrentActionPoints() <= 0)
+        // Effective AP = current AP minus any pending attack intents (to match UI display).
+        int pendingAttacks = BoardManager.Instance != null ? BoardManager.Instance.GetLocalPendingAttackCount() : 0;
+        int effectiveAP = localPlayer.GetCurrentActionPoints() - pendingAttacks;
+
+        if (effectiveAP <= 0)
         {
-            Debug.Log($"CARD DRAGGABLE || Cannot play - no AP remaining");
+            Debug.Log($"CARD DRAGGABLE || Cannot play - no effective AP remaining");
+            if (GameManagerUI.Instance != null)
+            {
+                GameManagerUI.Instance.PlayNoActionPointsFeedback();
+            }
             return false;
         }
 
@@ -477,7 +508,14 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (localPlayer.IsPlayerReady()) return false; // cannot change attack intents after Ready
         int pending = BoardManager.Instance != null ? BoardManager.Instance.GetLocalPendingAttackCount() : 0;
         int effectiveAP = localPlayer.GetCurrentActionPoints() - pending;
-        if (effectiveAP < 1) return false;
+        if (effectiveAP < 1)
+		{
+			if (GameManagerUI.Instance != null)
+			{
+				GameManagerUI.Instance.PlayNoActionPointsFeedback();
+			}
+			return false;
+		}
         if (cardVisual == null || cardVisual.CurrentCharges <= 0) return false;
         return true;
     }
@@ -489,7 +527,15 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (GameManager.Instance == null || !GameManager.Instance.CanAttack()) return false;
         if (Unity.Netcode.NetworkManager.Singleton == null || !Unity.Netcode.NetworkManager.Singleton.IsClient) return false;
         var localPlayer = Unity.Netcode.NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
-        if (localPlayer == null || localPlayer.GetCurrentActionPoints() <= 0) return false;
+        if (localPlayer == null) return false;
+		if (localPlayer.GetCurrentActionPoints() <= 0)
+		{
+			if (GameManagerUI.Instance != null)
+			{
+				GameManagerUI.Instance.PlayNoActionPointsFeedback();
+			}
+			return false;
+		}
         if (localPlayer.IsPlayerReady()) return false; // cannot perform attacks directly after Ready
         if (cardVisual == null) return false;
         if (cardVisual.CurrentCharges <= 0) return false;

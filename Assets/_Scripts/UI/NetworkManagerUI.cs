@@ -60,7 +60,7 @@ public class NetworkManagerUI : MonoBehaviour
 			hostPublicIpText.gameObject.SetActive(false);
 
 		if (statusText != null)
-			statusText.text = "";
+			statusText.text = "Find an opponent instantly.";
 
 		if (NetworkManager.Singleton != null)
 		{
@@ -233,7 +233,7 @@ public class NetworkManagerUI : MonoBehaviour
 
 		hasStartedGame = false;
 
-		SetStatus("");
+		SetStatus("Find an opponent instantly.");
 		HideHostIp();
 
 		// Restore the default quickplay description key so the panel text is correct next time it opens.

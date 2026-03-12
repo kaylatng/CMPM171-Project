@@ -50,6 +50,7 @@ public class GameManagerUI : MonoBehaviour
 	[SerializeField] private TextMeshProUGUI apText;
 	[SerializeField] private TextMeshProUGUI manaText;
 	[SerializeField] private TextMeshProUGUI hpText;
+	[SerializeField] private Outline apOutline;
 	
 	[Header("Opponent Status")]
 	[SerializeField] private TextMeshProUGUI opponentStatusText;
@@ -62,11 +63,23 @@ public class GameManagerUI : MonoBehaviour
 	[Header("Reset")]
 	[SerializeField] private Button resetBtn;
 
-	[Header("Game Over")]
-	[SerializeField] private GameObject gameOverPanel;
-	[SerializeField] private TextMeshProUGUI gameOverText;
+[Header("Game Over")]
+[SerializeField] private GameObject gameOverPanel;
+[SerializeField] private TextMeshProUGUI gameOverText;
 
-	private PlayerNetwork localPlayer;
+private PlayerNetwork localPlayer;
+
+// cache for AP tweening
+private int lastDisplayedAp = int.MinValue;
+private Coroutine apTweenRoutine;
+
+// shake/outline feedback for "no AP" attempts
+private RectTransform apTextRect;
+private Vector2 apTextRestPos;
+private bool apTextRestCached;
+private Coroutine apShakeRoutine;
+private Coroutine apOutlineRoutine;
+private Color apOutlineOriginalColor;
 
 	private void Awake()
 	{
@@ -92,6 +105,22 @@ public class GameManagerUI : MonoBehaviour
 			GameManager.Instance.CurrentRound.OnValueChanged += OnRoundChanged;
 			UpdatePhaseUI(GameManager.Instance.CurrentPhase.Value);
 			UpdateRoundUI(GameManager.Instance.CurrentRound.Value);
+		}
+
+		// cache AP text rect/outline
+		if (apText != null && apTextRect == null)
+		{
+			apTextRect = apText.rectTransform;
+			apTextRestPos = apTextRect.anchoredPosition;
+			apTextRestCached = true;
+		}
+		if (apOutline == null && apText != null)
+		{
+			apOutline = apText.GetComponent<Outline>();
+		}
+		if (apOutline != null)
+		{
+			apOutlineOriginalColor = apOutline.effectColor;
 		}
 
 		// initialize UI
@@ -606,6 +635,29 @@ public class GameManagerUI : MonoBehaviour
 		if (apText != null)
 		{
 			apText.text = $"{ap}/5";
+
+			// animate AP text when it changes (gain or spend)
+			if (ap != lastDisplayedAp)
+			{
+				lastDisplayedAp = ap;
+
+				if (apTweenRoutine != null)
+				{
+					StopCoroutine(apTweenRoutine);
+					apTweenRoutine = null;
+				}
+
+				var rt = apText.rectTransform;
+				rt.localScale = Vector3.one * 1.35f; // start slightly larger
+				apTweenRoutine = StartCoroutine(TweenScale(
+					rt,
+					rt.localScale,
+					Vector3.one,
+					0.25f,
+					EaseOutBack,
+					onComplete: () => apTweenRoutine = null
+				));
+			}
 			
 			// color code AP display
 			if (ap <= 0)
@@ -648,6 +700,83 @@ public class GameManagerUI : MonoBehaviour
 		if (localPlayer != null)
     	localPlayer.OnPlayerDataChanged -= HandlePlayerDataChanged;
 
+	}
+
+	/// <summary>Called when player attempts an action with zero AP. Shakes AP text and flashes red outline.</summary>
+	public void PlayNoActionPointsFeedback()
+	{
+		if (apText == null) return;
+
+		if (apTextRect == null)
+		{
+			apTextRect = apText.rectTransform;
+			apTextRestPos = apTextRect.anchoredPosition;
+			apTextRestCached = true;
+		}
+
+		if (apOutline == null)
+		{
+			apOutline = apText.GetComponent<Outline>();
+			if (apOutline != null)
+			{
+				apOutlineOriginalColor = apOutline.effectColor;
+			}
+		}
+
+		if (apTextRestCached && apShakeRoutine != null)
+		{
+			StopCoroutine(apShakeRoutine);
+			apShakeRoutine = null;
+		}
+		if (apTextRestCached)
+		{
+			apShakeRoutine = StartCoroutine(ShakeApText(0.2f, 10f));
+		}
+
+		if (apOutline != null)
+		{
+			if (apOutlineRoutine != null)
+			{
+				StopCoroutine(apOutlineRoutine);
+				apOutlineRoutine = null;
+			}
+			apOutlineRoutine = StartCoroutine(FlashApOutline(0.35f));
+		}
+	}
+
+	private System.Collections.IEnumerator ShakeApText(float duration, float magnitude)
+	{
+		if (apTextRect == null || !apTextRestCached) yield break;
+
+		float elapsed = 0f;
+		while (elapsed < duration)
+		{
+			elapsed += Time.deltaTime;
+			float t = Mathf.Clamp01(elapsed / duration);
+			float damper = 1f - t;
+
+			float offsetX = (Random.value * 2f - 1f) * magnitude * damper;
+			float offsetY = (Random.value * 2f - 1f) * magnitude * damper;
+
+			apTextRect.anchoredPosition = apTextRestPos + new Vector2(offsetX, offsetY);
+			yield return null;
+		}
+
+		apTextRect.anchoredPosition = apTextRestPos;
+	}
+
+	private System.Collections.IEnumerator FlashApOutline(float duration)
+	{
+		if (apOutline == null) yield break;
+
+		Color startColor = apOutline.effectColor;
+		apOutline.effectColor = Color.red;
+		apOutline.enabled = true;
+
+		yield return new WaitForSeconds(duration);
+
+		apOutline.effectColor = apOutlineOriginalColor != default ? apOutlineOriginalColor : startColor;
+		apOutlineRoutine = null;
 	}
 
 	private void HandlePlayerDataChanged(PlayerNetwork.PlayerData data) {

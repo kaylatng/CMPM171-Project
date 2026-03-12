@@ -19,10 +19,32 @@ public class PlayerResourcesUI : MonoBehaviour
     private PlayerNetwork localPlayer;
     private PlayerNetwork opponentPlayer;
 
+    // cached HP values to detect damage events
+    private int lastLocalHp = int.MinValue;
+    private int lastOpponentHp = int.MinValue;
+
+    // shake state
+    private RectTransform hpFillRect;
+    private RectTransform opponentHpFillRect;
+    private Vector2 hpFillRestPos;
+    private Vector2 opponentHpFillRestPos;
+    private bool hpRestPosCached;
+    private bool opponentHpRestPosCached;
+    private Coroutine hpShakeRoutine;
+    private Coroutine opponentHpShakeRoutine;
+
     private void Start()
     {
         FindLocalPlayer();
         FindOpponentPlayer();
+
+        // ensure bars are configured to drain from right to left
+        ConfigureHpFill(hpFill);
+        ConfigureHpFill(opponentHpFill);
+
+        // cache rects and rest positions for shake
+        CacheHpRects();
+
         UpdateAll(); 
     }
 
@@ -44,6 +66,33 @@ public class PlayerResourcesUI : MonoBehaviour
         }
 
         UpdateAll();
+    }
+
+    private void ConfigureHpFill(Image fill)
+    {
+        if (fill == null) return;
+        fill.type = Image.Type.Filled;
+        fill.fillMethod = Image.FillMethod.Horizontal;
+        // Left origin so bar drains from left to right as HP changes
+        fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+        fill.fillAmount = 1f;
+    }
+
+    private void CacheHpRects()
+    {
+        if (hpFill != null && hpFillRect == null)
+        {
+            hpFillRect = hpFill.rectTransform;
+            hpFillRestPos = hpFillRect.anchoredPosition;
+            hpRestPosCached = true;
+        }
+
+        if (opponentHpFill != null && opponentHpFillRect == null)
+        {
+            opponentHpFillRect = opponentHpFill.rectTransform;
+            opponentHpFillRestPos = opponentHpFillRect.anchoredPosition;
+            opponentHpRestPosCached = true;
+        }
     }
 
     private void FindLocalPlayer()
@@ -82,9 +131,83 @@ public class PlayerResourcesUI : MonoBehaviour
         int ap = localPlayer.GetCurrentActionPoints();
         int opponentHp = opponentPlayer != null ? opponentPlayer.GetCurrentHealth() : 0;
 
+        // detect damage and shake appropriate bar(s)
+        if (lastLocalHp != int.MinValue && hp < lastLocalHp)
+        {
+            StartHpShake(true);
+        }
+        if (opponentPlayer != null && lastOpponentHp != int.MinValue && opponentHp < lastOpponentHp)
+        {
+            StartHpShake(false);
+        }
+
+        lastLocalHp = hp;
+        lastOpponentHp = opponentHp;
+
         SetBar(hpFill, hp, maxHP);
         SetBar(opponentHpFill, opponentHp, maxHP);
         SetPips(ap);
+    }
+
+    private void StartHpShake(bool isLocal)
+    {
+        CacheHpRects();
+
+        if (isLocal)
+        {
+            if (hpFillRect == null || !hpRestPosCached) return;
+
+            if (hpShakeRoutine != null)
+            {
+                StopCoroutine(hpShakeRoutine);
+                hpShakeRoutine = null;
+            }
+
+            hpShakeRoutine = StartCoroutine(ShakeRectTransform(
+                hpFillRect,
+                hpFillRestPos,
+                0.15f,
+                8f
+            ));
+        }
+        else
+        {
+            if (opponentHpFillRect == null || !opponentHpRestPosCached) return;
+
+            if (opponentHpShakeRoutine != null)
+            {
+                StopCoroutine(opponentHpShakeRoutine);
+                opponentHpShakeRoutine = null;
+            }
+
+            opponentHpShakeRoutine = StartCoroutine(ShakeRectTransform(
+                opponentHpFillRect,
+                opponentHpFillRestPos,
+                0.15f,
+                8f
+            ));
+        }
+    }
+
+    private System.Collections.IEnumerator ShakeRectTransform(RectTransform rect, Vector2 restPos, float duration, float magnitude)
+    {
+        if (rect == null) yield break;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float damper = 1f - t; // fade out over time
+
+            float offsetX = (Random.value * 2f - 1f) * magnitude * damper;
+            float offsetY = (Random.value * 2f - 1f) * magnitude * damper;
+
+            rect.anchoredPosition = restPos + new Vector2(offsetX, offsetY);
+            yield return null;
+        }
+
+        rect.anchoredPosition = restPos;
     }
 
     private void SetBar(Image fill, int current, int max)
