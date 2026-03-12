@@ -22,6 +22,9 @@ public class CardVisual : MonoBehaviour
     private Sprite cardBackSprite;
     private bool hasBeenRevealed; // once true, card stays face-up
 
+    // Visual override: opponent hand cards should hide frame + stars only while in opponent hand.
+    private bool hideFrameAndStars = false;
+
     // Attack charges (runtime); when 0 and attack is used, card is removed
     private int currentCharges = 1;
     private bool scheduledToAttack = false;
@@ -44,6 +47,13 @@ public class CardVisual : MonoBehaviour
     public bool IsFaceDown => isFaceDown;
     public int CurrentCharges => currentCharges;
     public bool ScheduledToAttack => scheduledToAttack;
+
+    public void SetHideFrameAndStars(bool hide)
+    {
+        hideFrameAndStars = hide;
+        if (frameRenderer != null) frameRenderer.enabled = !hideFrameAndStars;
+        RefreshChargeStars();
+    }
 
     public void Initialize(int id, CardData data)
     {
@@ -171,7 +181,7 @@ public class CardVisual : MonoBehaviour
     {
         // Number of visible stars = remaining charges on this card
         int visibleCharges = Mathf.Max(0, currentCharges);
-        bool showStars = !isFaceDown;
+        bool showStars = !hideFrameAndStars;
         Transform starRoot = transform.Find("TiltPivot");
         if (starRoot == null) starRoot = transform;
         for (int i = 1; i <= 3; i++)
@@ -283,7 +293,6 @@ public class CardVisual : MonoBehaviour
         if (isFaceDown)
         {
             if (faceRenderer != null) faceRenderer.enabled = false;
-            if (frameRenderer != null) frameRenderer.enabled = false;
             // Hide prefab "Square" child so its white sprite doesn't render over the card back
             var squareChild = transform.Find("Square");
             if (squareChild != null)
@@ -304,7 +313,6 @@ public class CardVisual : MonoBehaviour
         else
         {
             if (faceRenderer != null) faceRenderer.enabled = true;
-            if (frameRenderer != null) frameRenderer.enabled = true;
             // Re-enable prefab "Square" child when face-up (e.g. after reveal)
             var squareChild = transform.Find("Square");
             if (squareChild != null)

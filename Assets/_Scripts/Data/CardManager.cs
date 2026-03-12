@@ -119,6 +119,13 @@ public class CardManager : MonoBehaviour
 
         InitializeCardVisual(newCard, cardId, isPlayerCard);
 
+        // Only opponent-hand visuals hide frame + stars (opponent board cards should not be affected).
+        CardVisual cv = newCard.GetComponent<CardVisual>();
+        if (cv != null)
+        {
+            cv.SetHideFrameAndStars(!isPlayerCard);
+        }
+
         // Add hover listener for Balatro-style hover effect
         AddCardHoverListener(newCard, isPlayerCard);
 
@@ -144,6 +151,14 @@ public class CardManager : MonoBehaviour
         newCard.transform.localScale = Vector3.one;
 
         InitializeCardVisual(newCard, cardId, revealCard);
+
+        // If this is being spawned into opponent hand, hide frame + stars only there.
+        CardVisual cv = newCard.GetComponent<CardVisual>();
+        if (cv != null)
+        {
+            bool isOpponentHand = parent != null && parent.name == "OpponentHandZone";
+            cv.SetHideFrameAndStars(isOpponentHand);
+        }
 
         Debug.Log($"CARD MANAGER || Spawned card {cardId} directly at parent {parent.name}");
         return newCard;
