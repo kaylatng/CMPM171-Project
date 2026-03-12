@@ -71,6 +71,7 @@
     <Compile Include="Assets\_Scripts\UI\GameManagerUI.cs" />
     <Compile Include="Assets\_Scripts\UI\CardMergeEffects.cs" />
     <Compile Include="Assets\_Scripts\UI\MainMenu\MainMenuController.cs" />
+    <Compile Include="Assets\_Scripts\UI\CardTooltipOnHover.cs" />
     <Compile Include="Assets\_Scripts\Audio\SFXManager.cs" />
     <Compile Include="Assets\_Scripts\Networking\GameManager.cs" />
     <Compile Include="Assets\_Scripts\Networking\DeckManager.cs" />
