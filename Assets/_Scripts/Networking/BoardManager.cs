@@ -450,6 +450,7 @@ public class BoardManager : MonoBehaviour
 
     public bool TryPlaceCard(GameObject card, bool isPlayerCard, int? preferredIndex = null)
     {
+        Debug.Log("BOARD MANAGER || TryPlaceCard CALLED");
         if (card == null)
         {
             Debug.LogError("BOARD MANAGER || Cannot place null card");
@@ -534,6 +535,11 @@ public class BoardManager : MonoBehaviour
         if (isPlayerCard)
         {
             NotifyServerCardPlaced(card);
+        }
+        if (isPlayerCard && SFXManager.Instance != null)
+        {
+            Debug.Log("SFX || PlayCardPlace from TryPlaceCard");
+            SFXManager.Instance.PlayCardPlace();
         }
 
         return true;
@@ -666,6 +672,11 @@ public class BoardManager : MonoBehaviour
 			// Update the visual with new tier data (frame, art, local charges)
 			targetVisual.Initialize(targetVisual.CardID, currentData.nextTier);
             targetVisual.TweenUpgradeStars();
+
+            if (SFXManager.Instance != null)
+            {
+                SFXManager.Instance.PlayCardUpgrade();
+            }
 
 			// Tell the server about the new tier + max charges so damage/charges are authoritative
 			if (isPlayerBoard && Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsClient)
@@ -1131,6 +1142,11 @@ public class BoardManager : MonoBehaviour
         }
         card.transform.position = targetPos;
 
+        if (SFXManager.Instance != null)
+        {
+            SFXManager.Instance.PlayCardAttack();
+        }
+
         elapsed = 0f;
         while (elapsed < attackReturnDuration)
         {
@@ -1237,6 +1253,8 @@ public class BoardManager : MonoBehaviour
     // The bool parameter can be either isFromHand or shouldNotifyServer - both indicate server notification should happen
     public void OnCardPlacedInSlot(BoardSlot slot, GameObject card, bool shouldNotifyServer = true)
     {
+
+        Debug.Log("BOARD MANAGER || OnCardPlacedInSlot CALLED");
         if (slot == null || card == null) return;
         
         // If card is being placed in a player slot and should notify server
@@ -1244,7 +1262,7 @@ public class BoardManager : MonoBehaviour
         {
             NotifyServerCardPlaced(card);
         }
-        
+
         Debug.Log($"BOARD MANAGER || Card placed in slot {slot.SlotIndex} (notify server: {shouldNotifyServer})");
     }
     

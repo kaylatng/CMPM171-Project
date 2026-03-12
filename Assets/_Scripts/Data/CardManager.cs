@@ -132,6 +132,11 @@ public class CardManager : MonoBehaviour
         // Arrange cards with smooth animation
         ArrangeCardsInHand(targetZone);
 
+         if (isPlayerCard && SFXManager.Instance != null)
+    {
+        SFXManager.Instance.PlayCardPlace();
+    }
+
         Debug.Log($"CARD MANAGER || Spawned card {cardId} in {(isPlayerCard ? "player" : "opponent")} hand");
         return newCard;
     }
