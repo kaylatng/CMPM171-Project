@@ -742,6 +742,12 @@ private Color apOutlineOriginalColor;
 			}
 			apOutlineRoutine = StartCoroutine(FlashApOutline(0.35f));
 		}
+
+		// Play buzzer sound when AP is zero and we show this feedback.
+		if (SFXManager.Instance != null)
+		{
+			SFXManager.Instance.PlayNoApBuzzer();
+		}
 	}
 
 	private System.Collections.IEnumerator ShakeApText(float duration, float magnitude)

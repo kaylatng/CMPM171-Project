@@ -2174,6 +2174,7 @@ MonoBehaviour:
   cardUpgradeClip: {fileID: 8300000, guid: 8448a9381feaa7049a849a2ff781047e, type: 3}
   cardAttackClip: {fileID: 8300000, guid: e156e4794ef8c3f4e8966a32872436f6, type: 3}
   buttonClickClip: {fileID: 8300000, guid: 3d1b19b73323b1b4eb8616d2421ad231, type: 3}
+  noApBuzzerClip: {fileID: 8300000, guid: 88b33e167add44e4db66e3ba2129cdc6, type: 3}
 --- !u!1 &653717952
 GameObject:
   m_ObjectHideFlags: 0
@@ -2416,6 +2417,7 @@ MonoBehaviour:
   apText: {fileID: 1752521635}
   manaText: {fileID: 0}
   hpText: {fileID: 612048173}
+  apOutline: {fileID: 1752521637}
   opponentStatusText: {fileID: 577605947}
   opponentReadyIndicator: {fileID: 0}
   opponentHpText: {fileID: 554620058}
@@ -5959,6 +5961,7 @@ GameObject:
   - component: {fileID: 1752521634}
   - component: {fileID: 1752521636}
   - component: {fileID: 1752521635}
+  - component: {fileID: 1752521637}
   m_Layer: 5
   m_Name: apText
   m_TagString: Untagged
@@ -6084,6 +6087,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1752521633}
   m_CullTransparentMesh: 1
+--- !u!114 &1752521637
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1752521633}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.5}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
 --- !u!1001 &1776086998
 PrefabInstance:
   m_ObjectHideFlags: 0

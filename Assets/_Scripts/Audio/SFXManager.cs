@@ -6,11 +6,12 @@ public class SFXManager : MonoBehaviour
 
     [SerializeField] private AudioSource sfxSource;
 
-    [Header("Clips")]
-    [SerializeField] private AudioClip cardPlaceClip;
-    [SerializeField] private AudioClip cardUpgradeClip;
-    [SerializeField] private AudioClip cardAttackClip;
-    [SerializeField] private AudioClip buttonClickClip;
+[Header("Clips")]
+[SerializeField] private AudioClip cardPlaceClip;
+[SerializeField] private AudioClip cardUpgradeClip;
+[SerializeField] private AudioClip cardAttackClip;
+[SerializeField] private AudioClip buttonClickClip;
+[SerializeField] private AudioClip noApBuzzerClip;
 
     private void Awake()
     {
@@ -47,4 +48,5 @@ public class SFXManager : MonoBehaviour
     public void PlayCardUpgrade() => Play(cardUpgradeClip);
     public void PlayCardAttack() => Play(cardAttackClip);
     public void PlayButtonClick() => Play(buttonClickClip);
+    public void PlayNoApBuzzer() => Play(noApBuzzerClip);
 }
