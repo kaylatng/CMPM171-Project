@@ -54,6 +54,13 @@ public class CardShadow : MonoBehaviour
 
     private void CreateShadowSprite()
     {
+        // Avoid creating a second shadow if this runs more than once (e.g. in build mode / double init).
+        if (shadowObject != null)
+            return;
+
+        // Remove any stale "Shadow" child/sibling so we never end up with two (first non-reactive, second reactive).
+        DestroyExistingShadowClones();
+
         // If this card is UI (under a Canvas), create a UI shadow so it sorts correctly with the background UI.
         if (cardRectTransform != null && GetComponentInParent<Canvas>() != null)
         {
@@ -62,6 +69,32 @@ public class CardShadow : MonoBehaviour
         }
 
         CreateSpriteShadow();
+    }
+
+    /// <summary>Remove any existing Shadow children or siblings we don't own, so only one reactive shadow exists.</summary>
+    private void DestroyExistingShadowClones()
+    {
+        Transform root = transform;
+        for (int i = root.childCount - 1; i >= 0; i--)
+        {
+            Transform child = root.GetChild(i);
+            if (child.name == "Shadow" && child.gameObject != shadowObject)
+            {
+                Destroy(child.gameObject);
+            }
+        }
+        Transform parent = root.parent;
+        if (parent != null)
+        {
+            for (int i = parent.childCount - 1; i >= 0; i--)
+            {
+                Transform sibling = parent.GetChild(i);
+                if (sibling != root && sibling.name == "Shadow" && sibling.gameObject != shadowObject)
+                {
+                    Destroy(sibling.gameObject);
+                }
+            }
+        }
     }
 
     private void CreateSpriteShadow()
@@ -86,7 +119,6 @@ public class CardShadow : MonoBehaviour
     private void CreateUIShadow()
     {
         shadowObject = new GameObject("Shadow", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-
         // Make shadow a sibling directly behind the card in the UI hierarchy.
         Transform parent = transform.parent != null ? transform.parent : transform;
         shadowObject.transform.SetParent(parent, false);

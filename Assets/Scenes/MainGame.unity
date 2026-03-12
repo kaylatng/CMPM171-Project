@@ -1050,7 +1050,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CardManager
   cardLibrary: {fileID: 11400000, guid: d6c28565e4e0aef44a1c70044750072c, type: 2}
-  cardPrefab: {fileID: 3401543228492905270, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
+  cardPrefab: {fileID: 915261632}
   cardSpacing: 1.5
   maxCardSpread: 8
   cardArcHeight: 0.2
@@ -2003,6 +2003,11 @@ Transform:
   - {fileID: 1619030595}
   m_Father: {fileID: 1660150826}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &915261632 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3401543228492905270, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
+  m_PrefabInstance: {fileID: 1776086998}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &941654900
 GameObject:
   m_ObjectHideFlags: 0
@@ -4024,29 +4029,9 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1249795500}
     m_Modifications:
-    - target: {fileID: -7940892478253442166, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1737916698880274712, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_Layer
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1964649297677522096, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_Layer
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2925440338857268101, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_Layer
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 3401543228492905270, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
       propertyPath: m_Name
       value: CardPrefab
-      objectReference: {fileID: 0}
-    - target: {fileID: 3401543228492905270, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_Layer
-      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3644008801552903713, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
       propertyPath: m_LocalPosition.x
@@ -4086,46 +4071,6 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3644008801552903713, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3776071034082901224, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_Layer
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4921017928380426323, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 5880381924538101725, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_Layer
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6227577644850757542, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_Layer
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7139950848945062014, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_Layer
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7310797581094304778, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_SortingLayer
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 7310797581094304778, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_SortingOrder
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7310797581094304778, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_SortingLayerID
-      value: 352997363
-      objectReference: {fileID: 0}
-    - target: {fileID: 8185246411774644843, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_Layer
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8920532568724183783, guid: 92fe26ee2fbf5ac46ab2b72126b1d093, type: 3}
-      propertyPath: m_Layer
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
