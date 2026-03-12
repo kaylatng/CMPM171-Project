@@ -16,15 +16,20 @@ public class DeckClickable : MonoBehaviour, IPointerClickHandler
 	
 	public void OnPointerClick(PointerEventData eventData)
 	{
-		if (NetworkManager.Singleton.IsClient && NetworkManager.Singleton.LocalClient != null)
+		if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsClient) return;
+		if (NetworkManager.Singleton.LocalClient == null || NetworkManager.Singleton.LocalClient.PlayerObject == null) return;
+
+		var player = NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<PlayerNetwork>();
+		if (player == null) return;
+
+		// Once the player has clicked Ready, the deck should no longer respond to clicks this turn.
+		if (player.IsPlayerReady())
 		{
-			var player = NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<PlayerNetwork>();
-			
-			if (player != null)
-			{
-				player.RequestCardDrawServerRpc();
-			}
+			Debug.Log("DECK CLICKABLE || Click blocked - player is Ready");
+			return;
 		}
+
+		player.RequestCardDrawServerRpc();
 	}
 
 	public void OnPointerEnter(PointerEventData eventData)

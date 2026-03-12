@@ -566,7 +566,7 @@ public class GameManagerUI : MonoBehaviour
 		// no opponent found
 		if (opponentStatusText != null)
 		{
-			opponentStatusText.text = "Opponent: Not Connected";
+			opponentStatusText.text = "Not Connected";
 		}
 		if (opponentHpText != null)
 		{
@@ -609,15 +609,16 @@ public class GameManagerUI : MonoBehaviour
 			
 			// color code AP display
 			if (ap <= 0)
-			{
-				apText.color = Color.red;
-			} else if (ap <= 2)
-			{
-				apText.color = Color.yellow;
-			} else
-			{
-				apText.color = Color.white;
-			}
+			// {
+			// 	apText.color = Color.red;
+			// } else if (ap <= 2)
+			// {
+			// 	apText.color = Color.yellow;
+			// } else
+			// {
+			// 	apText.color = Color.white;
+			// }
+			apText.color = Color.white;
 		}
 
 		if (manaText != null)
@@ -627,12 +628,13 @@ public class GameManagerUI : MonoBehaviour
 
 		if (hpText != null) {
 			hpText.text = $"{health}/10";
-			if (health <= 5)
-				hpText.color = Color.red;
-			else if (health <= 10)
-				hpText.color = Color.yellow;
-			else
-				hpText.color = Color.white;
+			// if (health <= 5)
+			// 	hpText.color = Color.red;
+			// else if (health <= 10)
+			// 	hpText.color = Color.yellow;
+			// else
+			// 	hpText.color = Color.white;
+			hpText.color = Color.white;
 		}
 	}
 

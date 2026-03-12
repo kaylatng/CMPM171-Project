@@ -65,6 +65,19 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (isDragging) return;
         if (!IsPlayerCard()) return;
 
+        // If we've already clicked Ready this turn, ignore any further board interactions.
+        if (!skipNetworkChecks &&
+            NetworkManager.Singleton != null &&
+            NetworkManager.Singleton.IsClient)
+        {
+            var localPlayer = NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
+            if (localPlayer != null && localPlayer.IsPlayerReady())
+            {
+                Debug.Log("CARD DRAGGABLE || Click blocked - player is Ready");
+                return;
+            }
+        }
+
         // Toggle Attack (Planning Phase only): first tap = set attack intent + tilt, second tap = undo
         if (isOnBoard && GameManager.Instance != null && GameManager.Instance.CanAttack())
         {
@@ -368,6 +381,13 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             return false;
         }
 
+        // Once the player has clicked Ready, they can no longer play/move cards this turn.
+        if (localPlayer.IsPlayerReady())
+        {
+            Debug.Log("CARD DRAGGABLE || Cannot play - player is Ready");
+            return false;
+        }
+
         if (localPlayer.GetCurrentActionPoints() <= 0)
         {
             Debug.Log($"CARD DRAGGABLE || Cannot play - no AP remaining");
@@ -454,6 +474,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (Unity.Netcode.NetworkManager.Singleton == null || !Unity.Netcode.NetworkManager.Singleton.IsClient) return false;
         var localPlayer = Unity.Netcode.NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
         if (localPlayer == null) return false;
+        if (localPlayer.IsPlayerReady()) return false; // cannot change attack intents after Ready
         int pending = BoardManager.Instance != null ? BoardManager.Instance.GetLocalPendingAttackCount() : 0;
         int effectiveAP = localPlayer.GetCurrentActionPoints() - pending;
         if (effectiveAP < 1) return false;
@@ -469,6 +490,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (Unity.Netcode.NetworkManager.Singleton == null || !Unity.Netcode.NetworkManager.Singleton.IsClient) return false;
         var localPlayer = Unity.Netcode.NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
         if (localPlayer == null || localPlayer.GetCurrentActionPoints() <= 0) return false;
+        if (localPlayer.IsPlayerReady()) return false; // cannot perform attacks directly after Ready
         if (cardVisual == null) return false;
         if (cardVisual.CurrentCharges <= 0) return false;
         return true;
