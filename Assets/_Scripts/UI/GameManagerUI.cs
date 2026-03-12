@@ -364,6 +364,30 @@ public class GameManagerUI : MonoBehaviour
 
 	private void UpdatePhaseUI(GameManager.GamePhase phase)
 	{
+		// Hide the visual indicator for the ResourceGain (resource accumulation) phase.
+		// The phase still exists in code/logic, but players won't see it.
+		if (phase == GameManager.GamePhase.ResourceGain)
+		{
+			// Hide phase panel if it's currently visible.
+			if (phasePanel != null)
+			{
+				phasePanel.SetActive(false);
+			}
+
+			// Clear any on-screen phase text.
+			if (phaseText != null)
+			{
+				phaseText.text = string.Empty;
+			}
+			if (phasePanelText != null)
+			{
+				phasePanelText.text = string.Empty;
+			}
+
+			// Do not play any enter/exit animations for this hidden phase.
+			return;
+		}
+
 		// Prefer the new panel text, but keep the old field working if still used in-scene.
 		var targetText = phasePanelText != null ? phasePanelText : phaseText;
 		if (targetText == null) return;
@@ -392,10 +416,21 @@ public class GameManagerUI : MonoBehaviour
 				// targetText.color = Color.yellow;
 				break;
 			case GameManager.GamePhase.Cleanup:
-				targetText.text = "Phase: Cleanup";
-				phaseText.text = "Phase: Cleanup";
-				// targetText.color = Color.white;
-				break;
+				// Hide Cleanup phase visuals; keep logic-only.
+				if (phasePanel != null)
+				{
+					phasePanel.SetActive(false);
+				}
+				if (phaseText != null)
+				{
+					phaseText.text = string.Empty;
+				}
+				if (phasePanelText != null)
+				{
+					phasePanelText.text = string.Empty;
+				}
+				// Skip auto-hide / panel animations for hidden cleanup.
+				return;
 		}
 
 		// If you're using the panel, optionally auto-hide it.
