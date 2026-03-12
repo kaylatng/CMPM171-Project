@@ -283,7 +283,7 @@ public class UITutorialController : MonoBehaviour
         if (tutorialText != null)
         {
             tutorialText.gameObject.SetActive(true);
-            tutorialText.text = "Click READY, then wait for your opponent.";
+            tutorialText.text = "Click READY, then wait for your opponent. You cannot edit your actions after clicking READY!";
         }
     }
 

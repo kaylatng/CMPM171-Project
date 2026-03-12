@@ -150,6 +150,24 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             return;
         }
 
+        // If we've already clicked Ready this turn, completely block picking up cards from hand
+        // and play the same feedback as a "no AP" attempt. This must apply even when skipNetworkChecks is true.
+        if (NetworkManager.Singleton != null &&
+            NetworkManager.Singleton.IsClient)
+        {
+            var localPlayer = NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
+            if (localPlayer != null && localPlayer.IsPlayerReady())
+            {
+                Debug.Log("CARD DRAGGABLE || Drag blocked - player is Ready");
+                ShowCannotPlayFeedback();
+                if (GameManagerUI.Instance != null)
+                {
+                    GameManagerUI.Instance.PlayNoActionPointsFeedback();
+                }
+                return;
+            }
+        }
+
         if (!CanBePlayed())
         {
             ShowCannotPlayFeedback();
@@ -386,6 +404,13 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
                 var lp = NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>();
                 if (lp != null)
                 {
+                    // Even in skipNetworkChecks mode, once Ready is pressed this card should not be playable.
+                    if (lp.IsPlayerReady())
+                    {
+                        Debug.Log("CARD DRAGGABLE || Cannot play (skipNetworkChecks) - player is Ready");
+                        return false;
+                    }
+
                     int pendingAttacksTest = BoardManager.Instance != null ? BoardManager.Instance.GetLocalPendingAttackCount() : 0;
                     int effectiveApTest = lp.GetCurrentActionPoints() - pendingAttacksTest;
                     if (effectiveApTest <= 0)
@@ -428,7 +453,8 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
         // Effective AP = current AP minus any pending attack intents (to match UI display).
         int pendingAttacks = BoardManager.Instance != null ? BoardManager.Instance.GetLocalPendingAttackCount() : 0;
-        int effectiveAP = localPlayer.GetCurrentActionPoints() - pendingAttacks;
+        int currentAp = localPlayer.GetCurrentActionPoints();
+        int effectiveAP = currentAp - pendingAttacks;
 
         if (effectiveAP <= 0)
         {
