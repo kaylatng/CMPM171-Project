@@ -11,6 +11,13 @@ public class GameManagerUI : MonoBehaviour
 	[SerializeField] private Button readyBtn;
 	[SerializeField] private TextMeshProUGUI readyBtnText;
 	[SerializeField] private TextMeshProUGUI phaseText;
+
+	[Header("Phase Panel")]
+	[SerializeField] private GameObject phasePanel;
+	[SerializeField] private TextMeshProUGUI phasePanelText;
+	[SerializeField, Tooltip("If > 0, phase panel will auto-hide after this many seconds.")]
+	private float phasePanelAutoHideSeconds = 0f;
+	private Coroutine phasePanelHideRoutine;
 	
 	[Header("Resource Display")]
 	[SerializeField] private TextMeshProUGUI apText;
@@ -62,6 +69,11 @@ public class GameManagerUI : MonoBehaviour
 
 		// initialize UI
 		UpdateReadyButton(false);
+		if (phasePanel != null)
+		{
+			// Ensure it starts visible only if we have a phase to show; UpdatePhaseUI will toggle.
+			phasePanel.SetActive(false);
+		}
 		if (opponentReadyIndicator != null)
 		{
 			opponentReadyIndicator.SetActive(false);
@@ -178,27 +190,54 @@ public class GameManagerUI : MonoBehaviour
 
 	private void UpdatePhaseUI(GameManager.GamePhase phase)
 	{
-		if (phaseText == null) return;
+		// Prefer the new panel text, but keep the old field working if still used in-scene.
+		var targetText = phasePanelText != null ? phasePanelText : phaseText;
+		if (targetText == null) return;
+
+		if (phasePanel != null)
+		{
+			phasePanel.SetActive(true);
+		}
+
+		if (phasePanelHideRoutine != null)
+		{
+			StopCoroutine(phasePanelHideRoutine);
+			phasePanelHideRoutine = null;
+		}
 
 		switch (phase)
 		{
 			case GameManager.GamePhase.ResourceGain:
-				phaseText.text = "Phase: Resource Gain";
-				phaseText.color = Color.cyan;
+				targetText.text = "Phase: Resource Gain";
+				targetText.color = Color.cyan;
 				break;
 			case GameManager.GamePhase.Planning:
-				phaseText.text = "Phase: Planning";
-				phaseText.color = Color.green;
+				targetText.text = "Phase: Planning";
+				targetText.color = Color.green;
 				break;
 			case GameManager.GamePhase.Reveal:
-				phaseText.text = "Phase: Reveal";
-				phaseText.color = Color.yellow;
+				targetText.text = "Phase: Reveal";
+				targetText.color = Color.yellow;
 				break;
 			case GameManager.GamePhase.Cleanup:
-				phaseText.text = "Phase: Cleanup";
-				phaseText.color = Color.white;
+				targetText.text = "Phase: Cleanup";
+				targetText.color = Color.white;
 				break;
 		}
+
+		// If you're using the panel, optionally auto-hide it.
+		if (phasePanel != null && phasePanelAutoHideSeconds > 0f)
+		{
+			phasePanelHideRoutine = StartCoroutine(HidePhasePanelAfterDelay(phasePanelAutoHideSeconds));
+		}
+	}
+
+	private System.Collections.IEnumerator HidePhasePanelAfterDelay(float seconds)
+	{
+		yield return new WaitForSeconds(seconds);
+		if (phasePanel != null)
+			phasePanel.SetActive(false);
+		phasePanelHideRoutine = null;
 	}
 
 	private void UpdateRoundUI(int round)
