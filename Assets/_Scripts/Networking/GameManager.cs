@@ -17,6 +17,9 @@ public class GameManager : NetworkBehaviour
 	// Attack intents recorded during planning (attackerClientId, slotIndex). Cleared when processing reveal.
 	private List<(ulong attackerId, int slotIndex)> attackIntents = new List<(ulong, int)>();
 
+	// Track which clients have finished their reveal/attack animations so we don't advance phase early.
+	private readonly HashSet<ulong> revealAnimationsFinishedClients = new HashSet<ulong>();
+
 	private void Awake()
 	{
 		if (Instance == null) Instance = this;
@@ -142,6 +145,12 @@ public class GameManager : NetworkBehaviour
 	private System.Collections.IEnumerator ProcessReveal()
 	{
 		Debug.Log("GAME MANAGER || === REVEAL PHASE ===");
+
+		// Reset reveal animation tracking for this phase.
+		if (IsServer)
+		{
+			revealAnimationsFinishedClients.Clear();
+		}
 		
 		// reveal all cards on both boards (client clears tilts, then flip + merge)
 		RevealBoardsClientRpc();
@@ -186,7 +195,21 @@ public class GameManager : NetworkBehaviour
 		attackIntents.Clear();
 		ProcessAttacksPlayClientRpc();
 
-		yield return new WaitForSeconds(revealPhaseDuration);
+		// Wait until all connected clients report that their reveal + attack animations are finished,
+		// or fall back to a timeout as a safety net.
+		float elapsed = 0f;
+		float maxWait = Mathf.Max(1f, revealPhaseDuration);
+		while (elapsed < maxWait)
+		{
+			// All clients connected at this moment have finished.
+			int connected = NetworkManager.Singleton != null ? NetworkManager.Singleton.ConnectedClientsList.Count : 0;
+			if (connected > 0 && revealAnimationsFinishedClients.Count >= connected)
+			{
+				break;
+			}
+			elapsed += Time.deltaTime;
+			yield return null;
+		}
 
 		// move to cleanup phase
 		CurrentPhase.Value = GamePhase.Cleanup;
@@ -302,6 +325,21 @@ public class GameManager : NetworkBehaviour
 		if (BoardManager.Instance != null)
 		{
 			BoardManager.Instance.PlayAttacksSequence();
+		}
+	}
+
+	/// <summary>Called by clients when their reveal + attack animations are complete.</summary>
+	[Rpc(SendTo.Server, RequireOwnership = false)]
+	public void NotifyRevealAnimationsFinishedServerRpc(RpcParams rpcParams = default)
+	{
+		if (!IsServer || NetworkManager.Singleton == null)
+			return;
+
+		ulong senderId = rpcParams.Receive.SenderClientId;
+		if (!revealAnimationsFinishedClients.Contains(senderId))
+		{
+			revealAnimationsFinishedClients.Add(senderId);
+			Debug.Log($"GAME MANAGER || Client {senderId} reports reveal animations finished ({revealAnimationsFinishedClients.Count}/{NetworkManager.Singleton.ConnectedClientsList.Count})");
 		}
 	}
 

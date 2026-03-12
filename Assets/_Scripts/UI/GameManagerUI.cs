@@ -81,6 +81,12 @@ private Coroutine apShakeRoutine;
 private Coroutine apOutlineRoutine;
 private Color apOutlineOriginalColor;
 
+// HP damage feedback (shake + floating damage text)
+private RectTransform hpTextRect;
+private Vector2 hpTextRestPos;
+private bool hpTextRestCached;
+private Coroutine hpShakeRoutine;
+
 	private void Awake()
 	{
 		if (Instance == null) Instance = this;
@@ -121,6 +127,14 @@ private Color apOutlineOriginalColor;
 		if (apOutline != null)
 		{
 			apOutlineOriginalColor = apOutline.effectColor;
+		}
+
+		// cache HP text rect
+		if (hpText != null && hpTextRect == null)
+		{
+			hpTextRect = hpText.rectTransform;
+			hpTextRestPos = hpTextRect.anchoredPosition;
+			hpTextRestCached = true;
 		}
 
 		// initialize UI
@@ -276,10 +290,6 @@ private Color apOutlineOriginalColor;
 
 		switch (phase)
 		{
-			case GameManager.GamePhase.ResourceGain:
-				targetText.text = "Phase: Resource Gain";
-				// targetText.color = Color.cyan;
-				break;
 			case GameManager.GamePhase.Planning:
 				targetText.text = "Phase: Planning";
 				// targetText.color = Color.green;
@@ -783,6 +793,100 @@ private Color apOutlineOriginalColor;
 
 		apOutline.effectColor = apOutlineOriginalColor != default ? apOutlineOriginalColor : startColor;
 		apOutlineRoutine = null;
+	}
+
+	/// <summary>Called when HP is damaged. Shakes HP text and shows a floating "-damage" popup.</summary>
+	public void PlayHpDamageFeedback(int damageAmount, bool isLocalPlayerHp)
+	{
+		// Choose which HP text to shake on this client.
+		TextMeshProUGUI targetHpText = isLocalPlayerHp ? hpText : opponentHpText;
+		if (targetHpText == null) return;
+
+		// Shake the chosen HP text.
+		if (isLocalPlayerHp)
+		{
+			if (hpTextRect == null)
+			{
+				hpTextRect = hpText.rectTransform;
+				hpTextRestPos = hpTextRect.anchoredPosition;
+				hpTextRestCached = true;
+			}
+
+			if (hpTextRestCached && hpShakeRoutine != null)
+			{
+				StopCoroutine(hpShakeRoutine);
+				hpShakeRoutine = null;
+			}
+			if (hpTextRestCached)
+			{
+				hpShakeRoutine = StartCoroutine(ShakeHpText(0.25f, 12f));
+			}
+		}
+
+		// Spawn floating "-damage" popup near the chosen HP text.
+		StartCoroutine(ShowDamagePopup(targetHpText, damageAmount));
+	}
+
+	private System.Collections.IEnumerator ShakeHpText(float duration, float magnitude)
+	{
+		if (hpTextRect == null || !hpTextRestCached) yield break;
+
+		float elapsed = 0f;
+		while (elapsed < duration)
+		{
+			elapsed += Time.deltaTime;
+			float t = Mathf.Clamp01(elapsed / duration);
+			float damper = 1f - t;
+
+			float offsetX = (Random.value * 2f - 1f) * magnitude * damper;
+			float offsetY = (Random.value * 2f - 1f) * magnitude * damper;
+
+			hpTextRect.anchoredPosition = hpTextRestPos + new Vector2(offsetX, offsetY);
+			yield return null;
+		}
+
+		hpTextRect.anchoredPosition = hpTextRestPos;
+	}
+
+	private System.Collections.IEnumerator ShowDamagePopup(TextMeshProUGUI anchor, int damageAmount)
+	{
+		if (anchor == null) yield break;
+
+		// Clone the anchor text as a lightweight popup.
+		TextMeshProUGUI popup = Instantiate(anchor, anchor.transform.parent);
+		popup.text = $"-{damageAmount}";
+
+		// Start slightly to the left of the anchor.
+		RectTransform popupRect = popup.rectTransform;
+		Vector2 startPos = popupRect.anchoredPosition + new Vector2(130f, 0f);
+		Vector2 endPos = startPos + new Vector2(140f, 0f);
+
+		Color baseColor = popup.color;
+		baseColor.a = 1f;
+		popup.color = baseColor;
+
+		float duration = 0.6f;
+		float elapsed = 0f;
+
+		while (elapsed < duration)
+		{
+			elapsed += Time.deltaTime;
+			float t = Mathf.Clamp01(elapsed / duration);
+
+			// Move left-to-right with a tiny vertical arc.
+			Vector2 pos = Vector2.Lerp(startPos, endPos, t);
+			pos.y += Mathf.Sin(t * Mathf.PI) * 15f;
+			popupRect.anchoredPosition = pos;
+
+			// Fade out over time.
+			Color c = baseColor;
+			c.a = 1f - t;
+			popup.color = c;
+
+			yield return null;
+		}
+
+		Destroy(popup.gameObject);
 	}
 
 	private void HandlePlayerDataChanged(PlayerNetwork.PlayerData data) {

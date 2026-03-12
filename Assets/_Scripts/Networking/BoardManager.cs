@@ -1102,11 +1102,19 @@ public class BoardManager : MonoBehaviour
             if (!aOpponent && bOpponent) return 1;
             return 0;
         });
-        foreach (var data in pendingAttackResults)
-        {
-            yield return StartCoroutine(PlaySingleAttackResultCoroutine(data.attackerClientId, data.slotIndex, data.damageDealt, data.chargesRemaining, data.removeCard));
-        }
-        pendingAttackResults.Clear();
+		foreach (var data in pendingAttackResults)
+		{
+			yield return StartCoroutine(PlaySingleAttackResultCoroutine(data.attackerClientId, data.slotIndex, data.damageDealt, data.chargesRemaining, data.removeCard));
+		}
+		pendingAttackResults.Clear();
+
+		// Let the server know that this client has finished all reveal/attack animations.
+		if (GameManager.Instance != null &&
+			Unity.Netcode.NetworkManager.Singleton != null &&
+			Unity.Netcode.NetworkManager.Singleton.IsClient)
+		{
+			GameManager.Instance.NotifyRevealAnimationsFinishedServerRpc();
+		}
     }
 
     /// <summary>Play one attack result in reveal phase: animate card hitting opponent then return, consume charge, remove if 0.</summary>
@@ -1123,39 +1131,83 @@ public class BoardManager : MonoBehaviour
     {
         bool isAttackerLocal = Unity.Netcode.NetworkManager.Singleton != null &&
             Unity.Netcode.NetworkManager.Singleton.LocalClientId == attackerClientId;
+        bool isLocalClientKnown = Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsClient;
+        ulong localClientId = isLocalClientKnown ? Unity.Netcode.NetworkManager.Singleton.LocalClientId : 0;
+        bool isLocalDefender = isLocalClientKnown && localClientId != attackerClientId;
+
         GameObject card = GetCardAtBoardIndex(slotIndex, isAttackerLocal);
         if (card == null)
             yield break;
 
+        // Cache original rotation so we can restore it after the attack.
+        Quaternion originalRotation = card.transform.rotation;
         Vector3 startPos = card.transform.position;
-        Vector3 targetPos = isAttackerLocal && opponentBoardZone != null
-            ? opponentBoardZone.position
-            : (playerBoardZone != null ? playerBoardZone.position : startPos + new Vector3(0, 2f, 0));
 
+        // Determine which board this card belongs to:
+        // - Local attacker => player board (aim toward top-left of screen)
+        // - Remote attacker => opponent board (aim toward bottom-left of screen)
+        bool isPlayerBoard = isAttackerLocal;
+
+        Camera cam = Camera.main;
+        Vector3 endPos = startPos + new Vector3(0f, 2f, 0f);
+        if (cam != null)
+        {
+            float zPlane = Mathf.Abs(cam.transform.position.z - startPos.z);
+            // Top-left for player board, bottom-left for opponent board.
+            Vector3 viewportPos = isPlayerBoard
+                ? new Vector3(0f, 1f, zPlane)
+                : new Vector3(0f, 0f, zPlane);
+            endPos = cam.ViewportToWorldPoint(viewportPos);
+            endPos.z = startPos.z;
+        }
+
+        // Rotate card diagonally toward its corner target.
+        // Vector3 attackDir = (endPos - startPos).normalized;
+        // if (attackDir.sqrMagnitude > 0.0001f)
+        // {
+        //     float angle = Mathf.Atan2(attackDir.y, attackDir.x) * Mathf.Rad2Deg;
+        //     card.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+        // }
+
+        // Quick straight-line attack toward the corner.
         float elapsed = 0f;
         while (elapsed < attackFlyDuration)
         {
             elapsed += Time.deltaTime;
-            float t = elapsed / attackFlyDuration;
-            card.transform.position = Vector3.Lerp(startPos, targetPos, t);
+            float t = Mathf.Clamp01(elapsed / attackFlyDuration);
+            card.transform.position = Vector3.Lerp(startPos, endPos, t);
             yield return null;
         }
-        card.transform.position = targetPos;
+        card.transform.position = endPos;
 
         if (SFXManager.Instance != null)
         {
             SFXManager.Instance.PlayCardAttack();
         }
 
+        // After the forward attack finishes, trigger HP feedback for whoever took damage.
+        if (GameManagerUI.Instance != null)
+        {
+            // On each client:
+            // - If we're the defender, shake our local HP.
+            // - If we're the attacker, shake the opponent HP.
+            bool isLocalHp = isLocalDefender;
+            GameManagerUI.Instance.PlayHpDamageFeedback(damageDealt, isLocalHp);
+        }
+
+        // Return back to start more slowly, tweening out.
         elapsed = 0f;
         while (elapsed < attackReturnDuration)
         {
             elapsed += Time.deltaTime;
-            float t = elapsed / attackReturnDuration;
-            card.transform.position = Vector3.Lerp(targetPos, startPos, t);
+            float t = Mathf.Clamp01(elapsed / attackReturnDuration);
+            // Ease-out so the retreat feels slower and smoother.
+            float eased = t * t;
+            card.transform.position = Vector3.Lerp(endPos, startPos, eased);
             yield return null;
         }
         card.transform.position = startPos;
+        card.transform.rotation = originalRotation;
 
         CardVisual cv = card.GetComponent<CardVisual>();
         if (cv != null)

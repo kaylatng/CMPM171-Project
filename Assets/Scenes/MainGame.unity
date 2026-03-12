@@ -484,7 +484,7 @@ MonoBehaviour:
   invalidDropColor: {r: 1, g: 0.3, b: 0.3, a: 0.3}
   normalZoneColor: {r: 1, g: 1, b: 1, a: 0.1}
   attackFlyDuration: 0.35
-  attackReturnDuration: 0.25
+  attackReturnDuration: 1.1
 --- !u!4 &399265347
 Transform:
   m_ObjectHideFlags: 0
