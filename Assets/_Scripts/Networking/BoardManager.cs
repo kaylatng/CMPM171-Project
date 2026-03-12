@@ -223,6 +223,11 @@ public class BoardManager : MonoBehaviour
                 if (hasExistingCard)
                 {
                     RemoveOneOpponentCardAt(i);
+                    // Card went back to opponent hand (e.g. undo/swap back on server) — add one blank to opponent hand view.
+                    if (CardManager.Instance != null)
+                    {
+                        CardManager.Instance.AddOneOpponentHandCard();
+                    }
                 }
                 continue;
             }
@@ -1004,7 +1009,15 @@ public class BoardManager : MonoBehaviour
             Transform handZone = GameObject.Find("PlayerHandZone")?.transform;
             if (handZone != null)
             {
-                card.transform.SetParent(handZone);
+				card.transform.SetParent(handZone, false);
+				// Ensure it is treated as a hand card again.
+				var d = card.GetComponent<CardDraggable>();
+				if (d != null)
+				{
+					d.SetOnBoard(false);
+					d.SetCurrentSlot(null);
+				}
+				CardManager.Instance.ArrangeCardsInHand(handZone);
                 Debug.Log("BOARD MANAGER || Card returned to hand");
             }
         }
@@ -1277,6 +1290,16 @@ public class BoardManager : MonoBehaviour
             if (slot != null) slot.ClearSlotReferenceOnly();
         }
         Debug.Log("BOARD MANAGER || All boards cleared for reset");
+    }
+
+    /// <summary>
+    /// Stop all ongoing board coroutines and attack sequences.
+    /// Call this when the game is over so no further movement/animations continue.
+    /// </summary>
+    public void StopAllRevealAndAttackAnimations()
+    {
+        StopAllCoroutines();
+        pendingAttackResults.Clear();
     }
 
     public void ShowValidDropFeedback(bool isPlayerBoard)

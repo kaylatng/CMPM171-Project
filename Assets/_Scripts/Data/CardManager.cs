@@ -453,6 +453,23 @@ public class CardManager : MonoBehaviour
         }
     }
 
+    public void AddOneOpponentHandCard()
+    {
+        if (opponentHandZone == null)
+        {
+            AssignHandZones();
+        }
+
+        if (opponentHandZone == null)
+        {
+            Debug.LogWarning("CARD MANAGER || Cannot add opponent hand card - OpponentHandZone missing");
+            return;
+        }
+
+        // Opponent hand cards are hidden/blank visuals. We spawn cardId = -1.
+        SpawnCard(-1, false);
+    }
+
     public void ClearHandZone(bool isPlayerZone)
     {
         Transform targetZone = isPlayerZone ? playerHandZone : opponentHandZone;

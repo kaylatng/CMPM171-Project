@@ -63,6 +63,12 @@ public class GameManagerUI : MonoBehaviour
 	[Header("Reset")]
 	[SerializeField] private Button resetBtn;
 	
+	[Header("Return To Menu")]
+	[SerializeField] private Button returnBtn;
+	
+	[Header("Undo")]
+	[SerializeField] private Button undoBtn;
+	
 	[Header("Game Over")]
 	[SerializeField] private GameObject gameOverPanel;
 	[SerializeField] private TextMeshProUGUI gameOverText;
@@ -99,6 +105,11 @@ public class GameManagerUI : MonoBehaviour
 	private Coroutine tierUpRoutine;
 	private Color tierUpOriginalColor;
 
+	// Undo tracking (per turn, last played card only)
+	private int lastPlayedCardId = -1;
+	private int lastPlayedSlotIndex = -1;
+	private bool hasUndoAvailable = false;
+
 	private void Awake()
 	{
 		if (Instance == null) Instance = this;
@@ -114,6 +125,15 @@ public class GameManagerUI : MonoBehaviour
 		if (resetBtn != null)
 		{
 			resetBtn.onClick.AddListener(OnResetButtonClicked);
+		}
+		if (returnBtn != null)
+		{
+			returnBtn.onClick.AddListener(OnReturnButtonClicked);
+		}
+		if (undoBtn != null)
+		{
+			undoBtn.onClick.AddListener(OnUndoButtonClicked);
+			undoBtn.interactable = false;
 		}
 
 		// subscribe to game manager phase changes
@@ -200,6 +220,9 @@ public class GameManagerUI : MonoBehaviour
 		// check opponent ready status
 		CheckOpponentStatus();
 
+		// keep undo button state in sync with phase and readiness
+		UpdateUndoButtonState();
+
 		if (enablePhasePanelDebugToggle)
 		{
 #if ENABLE_INPUT_SYSTEM
@@ -219,6 +242,27 @@ public class GameManagerUI : MonoBehaviour
 		{
 			GameManager.Instance.RequestResetGameServerRpc();
 		}
+	}
+
+	private void OnReturnButtonClicked()
+	{
+		if (GameManager.Instance != null && NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient)
+		{
+			GameManager.Instance.RequestReturnToMainMenuServerRpc();
+		}
+	}
+
+	private void OnUndoButtonClicked()
+	{
+		if (localPlayer == null) return;
+		if (!hasUndoAvailable) return;
+		if (GameManager.Instance == null || !GameManager.Instance.CanPlayCards()) return;
+		if (localPlayer.IsPlayerReady()) return;
+		if (lastPlayedCardId < 0 || lastPlayedSlotIndex < 0) return;
+
+		localPlayer.RequestUndoLastPlay(lastPlayedSlotIndex, lastPlayedCardId);
+		// Immediately disable undo to prevent double-undo spam; server state change will follow.
+		ClearUndoState();
 	}
 
 	private void OnReadyButtonClicked()
@@ -256,6 +300,8 @@ public class GameManagerUI : MonoBehaviour
 			{
 				readyBtnText.text = "READY";
 			}
+			// once ready, no more undo this turn
+			ClearUndoState();
 		} else {
 			readyBtn.interactable = true;
 			if (readyBtnText != null)
@@ -269,6 +315,14 @@ public class GameManagerUI : MonoBehaviour
 		}
 	}
 
+	private void ClearUndoState()
+	{
+		lastPlayedCardId = -1;
+		lastPlayedSlotIndex = -1;
+		hasUndoAvailable = false;
+		UpdateUndoButtonState();
+	}
+
 	private void OnPhaseChanged(GameManager.GamePhase oldPhase, GameManager.GamePhase newPhase)
 	{
 		UpdatePhaseUI(newPhase);
@@ -277,6 +331,7 @@ public class GameManagerUI : MonoBehaviour
 		if (newPhase == GameManager.GamePhase.Planning)
 		{
 			UpdateReadyButton(false);
+			ClearUndoState();
 			
 			if (opponentReadyIndicator != null)
 			{
@@ -297,6 +352,8 @@ public class GameManagerUI : MonoBehaviour
 			{
 				readyBtn.interactable = false;
 			}
+			// undo cannot be used outside Planning
+			ClearUndoState();
 		}
 	}
 
@@ -326,14 +383,17 @@ public class GameManagerUI : MonoBehaviour
 		{
 			case GameManager.GamePhase.Planning:
 				targetText.text = "Phase: Planning";
+				phaseText.text = "Phase: Planning";
 				// targetText.color = Color.green;
 				break;
 			case GameManager.GamePhase.Reveal:
 				targetText.text = "Phase: Reveal";
+				phaseText.text = "Phase: Reveal";
 				// targetText.color = Color.yellow;
 				break;
 			case GameManager.GamePhase.Cleanup:
 				targetText.text = "Phase: Cleanup";
+				phaseText.text = "Phase: Cleanup";
 				// targetText.color = Color.white;
 				break;
 		}
@@ -657,6 +717,7 @@ public class GameManagerUI : MonoBehaviour
 		int pending = GetPendingAttackDeduction();
 		// Pending attacks now only cost AP; mana is not required.
 		UpdateResourceUI(ap - pending, mana, health);
+		UpdateUndoButtonState();
 	}
 
 	/// <summary>Called when server pushes new player data; applies pending attack deduction so display matches intent.</summary>
@@ -665,6 +726,7 @@ public class GameManagerUI : MonoBehaviour
 		int pending = GetPendingAttackDeduction();
 		// Pending attacks now only cost AP; mana is not required.
 		UpdateResourceUI(ap - pending, mana, health);
+		UpdateUndoButtonState();
 	}
 
 	private int GetPendingAttackDeduction()
@@ -1038,6 +1100,44 @@ public class GameManagerUI : MonoBehaviour
 		tierUpText.gameObject.SetActive(false);
 
 		tierUpRoutine = null;
+	}
+
+	private void UpdateUndoButtonState()
+	{
+		if (undoBtn == null) return;
+
+		bool canUseUndo =
+			hasUndoAvailable &&
+			GameManager.Instance != null &&
+			GameManager.Instance.CanPlayCards() &&
+			localPlayer != null &&
+			!localPlayer.IsPlayerReady() &&
+			lastPlayedCardId >= 0 &&
+			lastPlayedSlotIndex >= 0;
+
+		undoBtn.interactable = canUseUndo;
+	}
+
+	/// <summary>
+	/// Called when the local player successfully plays a card from hand onto their board during the current Planning phase.
+	/// Tracks the last play so the undo button can revert it.
+	/// </summary>
+	public void NotifyCardPlayedThisTurn(int cardId, int slotIndex)
+	{
+		if (cardId < 0 || slotIndex < 0)
+			return;
+
+		if (GameManager.Instance == null || !GameManager.Instance.CanPlayCards())
+			return;
+
+		if (localPlayer != null && localPlayer.IsPlayerReady())
+			return;
+
+		lastPlayedCardId = cardId;
+		lastPlayedSlotIndex = slotIndex;
+		hasUndoAvailable = true;
+
+		UpdateUndoButtonState();
 	}
 
 	public void ShowGameOver(bool isWin)

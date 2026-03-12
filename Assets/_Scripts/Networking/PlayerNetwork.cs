@@ -194,6 +194,12 @@ public class PlayerNetwork : NetworkBehaviour {
 		SetReadyServerRpc(true);
 	}
 
+	public void RequestUndoLastPlay(int slotIndex, int cardId)
+	{
+		if (!IsOwner) return;
+		UndoLastPlayServerRpc(slotIndex, cardId);
+	}
+
 	private void Update() {
 		if (!IsOwner) return;
 
@@ -391,6 +397,73 @@ public class PlayerNetwork : NetworkBehaviour {
 
 		NotifyAttackScheduledClientRpc(OwnerClientId, slotIndex);
 		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} scheduled attack with slot {slotIndex}");
+	}
+
+	/// <summary>
+	/// Server-side undo of the last card play this turn.
+	/// Refuses if phase is not Planning, player is Ready, or the provided slot/card do not match current board state.
+	/// </summary>
+	[ServerRpc]
+	private void UndoLastPlayServerRpc(int slotIndex, int cardId, ServerRpcParams serverRpcParams = default)
+	{
+		if (!IsServer) return;
+		if (GameManager.Instance == null || GameManager.Instance.CurrentPhase.Value != GameManager.GamePhase.Planning)
+		{
+			Debug.Log("PLAYER NETWORK || Cannot undo play - not in Planning phase");
+			return;
+		}
+
+		PlayerData data = playerData.Value;
+
+		// cannot undo after marking Ready
+		if (data.IsReady)
+		{
+			Debug.Log("PLAYER NETWORK || Cannot undo play - player already Ready");
+			return;
+		}
+
+		if (slotIndex < 0 || slotIndex >= 3)
+		{
+			Debug.Log($"PLAYER NETWORK || Cannot undo play - invalid slot index {slotIndex}");
+			return;
+		}
+
+		// ensure board arrays have enough slots
+		while (data.BoardCardIds.Length <= slotIndex) data.BoardCardIds.Add(-1);
+		while (data.BoardCardCharges.Length <= slotIndex) data.BoardCardCharges.Add(0);
+		while (data.BoardCardTiers.Length <= slotIndex) data.BoardCardTiers.Add(1);
+
+		if (data.BoardCardIds[slotIndex] != cardId)
+		{
+			Debug.Log($"PLAYER NETWORK || Cannot undo play - board slot {slotIndex} does not contain card {cardId}");
+			return;
+		}
+
+		// move card back to hand
+		data.HandCardIds.Add(cardId);
+		data.UpdateHandCount();
+
+		// clear board slot
+		data.BoardCardIds[slotIndex] = -1;
+		data.BoardCardCharges[slotIndex] = 0;
+		data.BoardCardTiers[slotIndex] = 1;
+
+		// refund the 1 AP spent when playing this card (clamped to 5)
+		data.ActionPoints = Mathf.Min(data.ActionPoints + 1, 5);
+
+		playerData.Value = data;
+
+		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} undid play of card {cardId} from slot {slotIndex}. AP: {data.ActionPoints}, Hand: {data.CardsInHandCount}");
+
+		// visually return the card on the owning client
+		ClientRpcParams ownerParams = new ClientRpcParams
+		{
+			Send = new ClientRpcSendParams
+			{
+				TargetClientIds = new ulong[] { OwnerClientId }
+			}
+		};
+		ReturnCardToHandClientRpc(cardId, ownerParams);
 	}
 
 	[ClientRpc]

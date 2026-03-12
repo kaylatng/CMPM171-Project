@@ -1,5 +1,6 @@
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 
 public class GameManager : NetworkBehaviour
@@ -19,6 +20,10 @@ public class GameManager : NetworkBehaviour
 
 	// Track which clients have finished their reveal/attack animations so we don't advance phase early.
 	private readonly HashSet<ulong> revealAnimationsFinishedClients = new HashSet<ulong>();
+
+	// True once a winner has been determined; prevents further phase progression or ready checks
+	// until the host/client explicitly triggers a reset.
+	private bool isGameOver = false;
 
 	private void Awake()
 	{
@@ -48,6 +53,14 @@ public class GameManager : NetworkBehaviour
 	private void OnPhaseChanged(GamePhase oldPhase, GamePhase newPhase)
 	{
 		if (!IsServer) return;
+
+		// Once the game is over, ignore any further automatic phase processing
+		// until a reset occurs.
+		if (isGameOver)
+		{
+			Debug.Log($"GAME MANAGER || Phase change ignored after game over: {oldPhase} -> {newPhase}");
+			return;
+		}
 
 		Debug.Log($"GAME MANAGER || Phase changed: {oldPhase} -> {newPhase}");
 
@@ -110,6 +123,9 @@ public class GameManager : NetworkBehaviour
 	public void CheckPlayersReadyServerRpc()
 	{
 		if (!IsServer) return;
+
+		// Do not process ready checks after the game has ended.
+		if (isGameOver) return;
 
 		// only check ready status during planning phase
 		if (CurrentPhase.Value != GamePhase.Planning) return;
@@ -290,6 +306,10 @@ public class GameManager : NetworkBehaviour
 		}
 
 		Debug.Log($"GAME MANAGER || Game over. Winner: {winnerId}, Loser: {loserId}");
+
+		// Mark game as over so no further automatic phase/ready logic runs until reset.
+		isGameOver = true;
+
 		GameOverClientRpc(winnerId, loserId);
 		return true;
 	}
@@ -369,6 +389,13 @@ public class GameManager : NetworkBehaviour
 		{
 			GameManagerUI.Instance.ShowGameOver(false);
 		}
+
+		// Stop any remaining reveal/attack animations or board movement once the
+		// game is over so the state is completely frozen until reset.
+		if (BoardManager.Instance != null)
+		{
+			BoardManager.Instance.StopAllRevealAndAttackAnimations();
+		}
 	}
 
 	public bool CanPlayCards()
@@ -393,6 +420,8 @@ public class GameManager : NetworkBehaviour
 		if (!IsServer) return;
 
 		Debug.Log("GAME MANAGER || Reset requested - resetting game to beginning");
+		// Clear game-over state so normal phase progression can start again.
+		isGameOver = false;
 		StopAllCoroutines();
 		attackIntents.Clear();
 		CurrentRound.Value = 0;
@@ -409,6 +438,33 @@ public class GameManager : NetworkBehaviour
 
 		ResetGameVisualsClientRpc();
 		StartCoroutine(ProcessResourceGain());
+	}
+
+	/// <summary>
+	/// Any client can request to return all players to the MainMenu scene.
+	/// The server will instruct all clients (including host) to disconnect and load MainMenu.
+	/// </summary>
+	[ServerRpc(RequireOwnership = false)]
+	public void RequestReturnToMainMenuServerRpc(ServerRpcParams serverRpcParams = default)
+	{
+		if (!IsServer) return;
+
+		Debug.Log("GAME MANAGER || Return-to-menu requested - sending clients back to MainMenu and shutting down network");
+		ReturnToMainMenuClientRpc();
+	}
+
+	[ClientRpc]
+	private void ReturnToMainMenuClientRpc()
+	{
+		// Cleanly tear down Netcode transport so the port is no longer bound.
+		if (NetworkManager.Singleton != null)
+		{
+			NetworkManager.Singleton.Shutdown();
+		}
+
+		// Load the main menu scene locally on each client.
+		// Ensure "MainMenu" is added to your Build Settings scenes list.
+		SceneManager.LoadScene("MainMenu");
 	}
 
 	[ClientRpc]

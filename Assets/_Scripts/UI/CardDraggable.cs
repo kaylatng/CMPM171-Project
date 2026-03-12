@@ -350,7 +350,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             return false;
         }
 
-        bool placed = BoardManager.Instance.TryPlaceCard(gameObject, true);
+		bool placed = BoardManager.Instance.TryPlaceCard(gameObject, true);
         
         if (placed)
         {
@@ -361,11 +361,21 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
                 CardManager.Instance.RemoveCardFromHand(gameObject);
             }
 
-            // Inform tutorial (if active) that a card from hand has been placed on the player board.
+			// Inform tutorial (if active) that a card from hand has been placed on the player board.
             if (UITutorialController.Instance != null)
             {
                 UITutorialController.Instance.NotifyCardPlacedOnPlayerBoardFromHand(gameObject, fromPlayerHand);
             }
+
+			// Track last played card for per-turn undo (only when coming from hand)
+			if (fromPlayerHand && GameManagerUI.Instance != null && BoardManager.Instance != null && cardVisual != null)
+			{
+				int slotIndex = BoardManager.Instance.GetCardBoardIndex(gameObject, true);
+				if (slotIndex >= 0)
+				{
+					GameManagerUI.Instance.NotifyCardPlayedThisTurn(cardVisual.CardID, slotIndex);
+				}
+			}
         }
 
         return placed;

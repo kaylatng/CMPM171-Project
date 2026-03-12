@@ -27,6 +27,10 @@ public class UITutorialController : MonoBehaviour
     [SerializeField] private GameObject apArrowHighlight;        // Arrow pointing at AP display
     [SerializeField] private TextMeshProUGUI apTutorialText;     // Text shown only on the AP panel
 
+    [Header("Undo Tip (on AP panel)")]
+    [SerializeField] private GameObject undoArrowHighlight;      // Arrow pointing at Undo button
+    [SerializeField] private TextMeshProUGUI undoTutorialText;   // Text shown only for the Undo tip
+
     [Header("Text")]
     [SerializeField] private TextMeshProUGUI tutorialText;
 
@@ -39,6 +43,7 @@ public class UITutorialController : MonoBehaviour
         HighlightAp,
         HighlightReady,
         MergeTip,
+        UndoTip,
         Done
     }
 
@@ -55,6 +60,7 @@ public class UITutorialController : MonoBehaviour
     private Coroutine attackFlashRoutine;
     private Coroutine readyFlashRoutine;
     private Coroutine apArrowFlashRoutine;
+    private Coroutine undoArrowFlashRoutine;
 
     private void Awake()
     {
@@ -94,10 +100,15 @@ public class UITutorialController : MonoBehaviour
         SetHighlight(attackCardHighlight, false);
         SetHighlight(readyHighlight, false);
         SetHighlight(apArrowHighlight, false);
+        SetHighlight(undoArrowHighlight, false);
 
         if (apInfoPanel != null)
         {
             apInfoPanel.SetActive(false);
+        }
+        if (apTutorialText != null)
+        {
+            apTutorialText.gameObject.SetActive(false);
         }
 
         // Ensure highlights are visual-only and do not block clicks.
@@ -106,10 +117,15 @@ public class UITutorialController : MonoBehaviour
         ConfigureHighlightForClicks(attackCardHighlight);
         ConfigureHighlightForClicks(readyHighlight);
         ConfigureHighlightForClicks(apArrowHighlight);
+        ConfigureHighlightForClicks(undoArrowHighlight);
         if (tutorialText != null)
         {
             tutorialText.gameObject.SetActive(false);
             tutorialText.text = string.Empty;
+        }
+        if (undoTutorialText != null)
+        {
+            undoTutorialText.gameObject.SetActive(false);
         }
 
         if (tutorialEnabled)
@@ -122,7 +138,7 @@ public class UITutorialController : MonoBehaviour
     {
         if (!tutorialEnabled) return;
 
-        if (currentStep == TutorialStep.HighlightAp || currentStep == TutorialStep.MergeTip)
+        if (currentStep == TutorialStep.HighlightAp || currentStep == TutorialStep.UndoTip || currentStep == TutorialStep.MergeTip)
         {
             bool clicked = false;
 
@@ -140,7 +156,7 @@ public class UITutorialController : MonoBehaviour
 
             if (clicked)
             {
-                if (currentStep == TutorialStep.HighlightAp)
+                if (currentStep == TutorialStep.HighlightAp || currentStep == TutorialStep.UndoTip)
                 {
                     NotifyApOverlayClicked();
                 }
@@ -171,7 +187,7 @@ public class UITutorialController : MonoBehaviour
         if (tutorialText != null)
         {
             tutorialText.gameObject.SetActive(true);
-            tutorialText.text = "Click the shared deck to draw a card.";
+            tutorialText.text = "Click the shared deck to draw a card. Your opponent is using the same deck!";
         }
     }
 
@@ -312,7 +328,7 @@ public class UITutorialController : MonoBehaviour
         if (tutorialText != null)
         {
             tutorialText.gameObject.SetActive(true);
-            tutorialText.text = "Play cards with the same picture to increase its damage. Good luck!";
+            tutorialText.text = "Play cards with the same picture to increase its damage. Don't let your opponent upgrade before you!";
         }
     }
 
@@ -328,6 +344,14 @@ public class UITutorialController : MonoBehaviour
         if (tutorialText != null)
         {
             tutorialText.gameObject.SetActive(false);
+        }
+        if (apTutorialText != null)
+        {
+            apTutorialText.gameObject.SetActive(false);
+        }
+        if (undoTutorialText != null)
+        {
+            undoTutorialText.gameObject.SetActive(false);
         }
     }
 
@@ -632,6 +656,55 @@ public class UITutorialController : MonoBehaviour
         apArrowFlashRoutine = null;
     }
 
+    private System.Collections.IEnumerator FlashUndoArrowHighlight()
+    {
+        if (undoArrowHighlight == null)
+        {
+            undoArrowFlashRoutine = null;
+            yield break;
+        }
+
+        var sr = undoArrowHighlight.GetComponent<SpriteRenderer>();
+        var img = undoArrowHighlight.GetComponent<Image>();
+        if (sr == null && img == null)
+        {
+            undoArrowFlashRoutine = null;
+            yield break;
+        }
+
+        Color original = sr != null ? sr.color : img.color;
+        float maxAlpha = original.a;
+        float minAlpha = 0.15f * maxAlpha;
+
+        while (tutorialEnabled && currentStep == TutorialStep.UndoTip && undoArrowHighlight != null)
+        {
+            if (!undoArrowHighlight.activeInHierarchy)
+            {
+                yield return null;
+                continue;
+            }
+
+            float t = Mathf.PingPong(Time.time * 2f, 1f);
+            float eased = t * t * (3f - 2f * t);
+            float alpha = Mathf.Lerp(minAlpha, maxAlpha, eased);
+
+            Color c = original;
+            c.a = alpha;
+            if (sr != null) sr.color = c;
+            if (img != null) img.color = c;
+
+            yield return null;
+        }
+
+        if (undoArrowHighlight != null)
+        {
+            if (sr != null) sr.color = original;
+            if (img != null) img.color = original;
+        }
+
+        undoArrowFlashRoutine = null;
+    }
+
     /// <summary>
     /// Called by DeckClickable when the player successfully clicks the deck.
     /// </summary>
@@ -665,25 +738,60 @@ public class UITutorialController : MonoBehaviour
     }
 
     /// <summary>
-    /// Called by the AP info overlay when the player taps the screen to continue.
+    /// Called by the AP info overlay or global click while AP/Undo tip is active.
     /// </summary>
     public void NotifyApOverlayClicked()
     {
         if (!tutorialEnabled) return;
-        if (currentStep != TutorialStep.HighlightAp) return;
 
-        if (apInfoPanel != null)
+        // First click: move from AP explanation to Undo explanation (on same panel).
+        if (currentStep == TutorialStep.HighlightAp)
         {
-            apInfoPanel.SetActive(false);
-        }
-        SetHighlight(apArrowHighlight, false);
+            if (apArrowHighlight != null)
+            {
+                SetHighlight(apArrowHighlight, false);
+            }
+            if (apTutorialText != null)
+            {
+                apTutorialText.gameObject.SetActive(false);
+            }
 
-        if (apTutorialText != null)
+            // Show Undo tip on the same AP panel.
+            currentStep = TutorialStep.UndoTip;
+
+            if (undoArrowHighlight != null)
+            {
+                SetHighlight(undoArrowHighlight, true);
+                if (undoArrowFlashRoutine == null)
+                {
+                    undoArrowFlashRoutine = StartCoroutine(FlashUndoArrowHighlight());
+                }
+            }
+
+            if (undoTutorialText != null)
+            {
+                undoTutorialText.gameObject.SetActive(true);
+                undoTutorialText.text = "Misplaced a card? Use Undo to return your most recent played card to your hand and refund its cost.";
+            }
+        }
+        // Second click: hide AP panel & Undo tip, proceed to Ready step.
+        else if (currentStep == TutorialStep.UndoTip)
         {
-            apTutorialText.gameObject.SetActive(false);
-        }
+            if (apInfoPanel != null)
+            {
+                apInfoPanel.SetActive(false);
+            }
+            if (undoArrowHighlight != null)
+            {
+                SetHighlight(undoArrowHighlight, false);
+            }
+            if (undoTutorialText != null)
+            {
+                undoTutorialText.gameObject.SetActive(false);
+            }
 
-        BeginReadyStep();
+            BeginReadyStep();
+        }
     }
 
     /// <summary>
