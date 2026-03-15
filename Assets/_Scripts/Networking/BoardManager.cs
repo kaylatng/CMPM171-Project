@@ -1,8 +1,10 @@
 using UnityEngine;
 using Unity.Netcode;
 using Unity.Collections;
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 public class BoardManager : MonoBehaviour
@@ -296,8 +298,12 @@ public class BoardManager : MonoBehaviour
             CardData data = lib.GetCardDataForTier(cardId, tier >= 1 && tier <= 3 ? tier : 1);
             if (data != null)
             {
+                int oldTier = visual.GetCurrentTier();
                 visual.Initialize(cardId, data);
-                visual.TweenUpgradeStars();
+                int newTier = data.tier;
+                bool willTween = newTier > oldTier;
+                if (willTween)
+                    visual.TweenUpgradeStars();
             }
         }
         ArrangeCardsOnBoard(false);

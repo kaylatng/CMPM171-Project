@@ -132,7 +132,7 @@ public class BoardSlot : MonoBehaviour, IPointerClickHandler, IDropHandler
         card.transform.localPosition = Vector3.zero;
         card.transform.localRotation = Quaternion.identity;
         card.transform.localScale = Vector3.one;
-        
+
         CardDraggable cardDraggable = card.GetComponent<CardDraggable>();
         if (cardDraggable != null)
         {
