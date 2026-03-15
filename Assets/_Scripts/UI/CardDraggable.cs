@@ -256,7 +256,10 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             {
                 if (isPlayerBoard)
                 {
-                    if (BoardManager.Instance.CanPlaceCardOnBoard(true) || isOnBoard)
+                    bool canPlace = BoardManager.Instance.CanPlaceCardOnBoard(true) || isOnBoard;
+                    bool canUpgradeFullBoard = !canPlace && cardVisual != null &&
+                        BoardManager.Instance.HasMatchingBoardCardForUpgrade(cardVisual.CardID, cardVisual.GetCurrentTier());
+                    if (canPlace || canUpgradeFullBoard)
                     {
                         BoardManager.Instance.ShowValidDropFeedback(true);
                     }
@@ -311,6 +314,7 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
                     else
                     {
                         Debug.Log("CARD DRAGGABLE || Failed to place on board, returning to hand");
+                        ShowCannotPlayFeedback();
                     }
                 }
                 else
@@ -348,6 +352,27 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         {
             ShowCannotPlayFeedback();
             return false;
+        }
+
+        // Full-board upgrade bypass: if board is 3/3 and this card matches a card on the board (same CardID + tier), merge into it instead of placing.
+        if (cardVisual != null && !isOnBoard)
+        {
+            int cardId = cardVisual.CardID;
+            int tier = cardVisual.GetCurrentTier();
+            if (!BoardManager.Instance.CanPlaceCardOnBoard(true) &&
+                BoardManager.Instance.TryGetMatchingBoardCard(cardId, tier, out GameObject targetBoardCard, out int slotIndex))
+            {
+                var localPlayer = NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient
+                    ? NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerNetwork>()
+                    : null;
+                if (localPlayer != null)
+                    localPlayer.PlayCardUpgradeFromHandServerRpc(cardId, slotIndex);
+                if (CardManager.Instance != null)
+                    CardManager.Instance.RemoveCardFromHand(gameObject);
+                BoardManager.Instance.RequestMergeFromHand(gameObject, targetBoardCard);
+                Debug.Log("CARD DRAGGABLE || Full-board upgrade: merged from hand into board card");
+                return true;
+            }
         }
 
 		bool placed = BoardManager.Instance.TryPlaceCard(gameObject, true);
@@ -483,6 +508,16 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         {
             CardData cardData = CardManager.Instance.GetCardLibrary().GetTierOneAssetFromPool(cardVisual.CardID);
             if (cardData == null) return false;
+        }
+
+        // If board is full, allow play only when this card is a valid upgrade for a card already on the board.
+        if (BoardManager.Instance != null && !BoardManager.Instance.CanPlaceCardOnBoard(true))
+        {
+            if (!BoardManager.Instance.HasMatchingBoardCardForUpgrade(cardVisual.CardID, cardVisual.GetCurrentTier()))
+            {
+                Debug.Log("CARD DRAGGABLE || Cannot play - board full and no matching card to upgrade");
+                return false;
+            }
         }
 
         return true;

@@ -141,6 +141,14 @@ public class BoardManager : MonoBehaviour
 
     private void OnOpponentPlayerDataChanged(PlayerNetwork.PlayerData previous, PlayerNetwork.PlayerData next)
     {
+        // Opponent hand: when they play a card (e.g. upgrade-from-hand), remove one card from our opponent hand view.
+        if (next.HandCardIds.Length < previous.HandCardIds.Length && CardManager.Instance != null)
+        {
+            int removed = previous.HandCardIds.Length - next.HandCardIds.Length;
+            for (int i = 0; i < removed; i++)
+                CardManager.Instance.RemoveOneOpponentHandCard();
+        }
+
         // Only resync opponent board when the authoritative board card IDs actually change.
         // Resource gain and other phase transitions modify HP/Mana/AP but leave BoardCardIds untouched;
         // re-syncing in those cases was causing extra visual copies of cards after merges.
@@ -160,6 +168,20 @@ public class BoardManager : MonoBehaviour
         if (boardChanged)
         {
             SyncOpponentBoardFromServerState(next.BoardCardIds);
+        }
+        else
+        {
+            // Board IDs unchanged but tiers may have changed (e.g. opponent did full-board upgrade).
+            bool tiersChanged = previous.BoardCardTiers.Length != next.BoardCardTiers.Length;
+            if (!tiersChanged && next.BoardCardTiers.Length > 0)
+            {
+                for (int i = 0; i < previous.BoardCardTiers.Length && i < next.BoardCardTiers.Length; i++)
+                {
+                    if (previous.BoardCardTiers[i] != next.BoardCardTiers[i]) { tiersChanged = true; break; }
+                }
+            }
+            if (tiersChanged)
+                SyncOpponentBoardTiers(next.BoardCardIds, next.BoardCardTiers);
         }
     }
 
@@ -255,6 +277,30 @@ public class BoardManager : MonoBehaviour
             int removeIndex = opponentBoardCards.Count - 1;
             RemoveOneOpponentCardAt(removeIndex);
         }
+    }
+
+    /// <summary>Apply server-authoritative tier (and charges) to existing opponent board cards. Called when BoardCardTiers changes but BoardCardIds do not (e.g. opponent full-board upgrade).</summary>
+    private void SyncOpponentBoardTiers(Unity.Collections.FixedList32Bytes<int> boardCardIds, Unity.Collections.FixedList32Bytes<int> boardCardTiers)
+    {
+        CardLibrary lib = library != null ? library : (CardManager.Instance != null ? CardManager.Instance.GetCardLibrary() : null);
+        if (lib == null) return;
+        for (int i = 0; i < opponentBoardCards.Count && i < boardCardIds.Length && i < boardCardTiers.Length; i++)
+        {
+            GameObject card = opponentBoardCards[i];
+            if (card == null) continue;
+            CardVisual visual = card.GetComponent<CardVisual>();
+            if (visual == null) continue;
+            int cardId = boardCardIds[i];
+            int tier = boardCardTiers[i];
+            if (cardId < 0) continue;
+            CardData data = lib.GetCardDataForTier(cardId, tier >= 1 && tier <= 3 ? tier : 1);
+            if (data != null)
+            {
+                visual.Initialize(cardId, data);
+                visual.TweenUpgradeStars();
+            }
+        }
+        ArrangeCardsOnBoard(false);
     }
 
     /// <summary>Remove and destroy one opponent board card at the given index. Used for incremental sync.</summary>
@@ -453,6 +499,60 @@ public class BoardManager : MonoBehaviour
         return targetBoard.Count < maxCardsPerBoard;
     }
 
+    /// <summary>Find a card on the player board that matches the given CardID and tier (for full-board upgrade bypass).</summary>
+    public bool TryGetMatchingBoardCard(int cardId, int tier, out GameObject matchingCard, out int slotIndex)
+    {
+        matchingCard = null;
+        slotIndex = -1;
+        int seekAssetId = (library != null) ? library.GetMappedAssetID(cardId) : cardId;
+        for (int i = 0; i < playerBoardCards.Count; i++)
+        {
+            GameObject card = playerBoardCards[i];
+            if (card == null) continue;
+            CardVisual visual = card.GetComponent<CardVisual>();
+            if (visual == null) continue;
+            int boardAssetId = (library != null) ? library.GetMappedAssetID(visual.CardID) : visual.CardID;
+            int boardTier = visual.GetCurrentTier();
+            if (boardAssetId == seekAssetId && boardTier == tier && boardTier < 3)
+            {
+                matchingCard = card;
+                slotIndex = GetCardBoardIndex(card, true);
+                if (slotIndex < 0) slotIndex = i;
+                return true;
+            }
+        }
+        // Also check slot-based cards
+        for (int i = 0; i < playerSlots.Count; i++)
+        {
+            BoardSlot slot = playerSlots[i];
+            if (slot?.OccupyingCard == null) continue;
+            CardVisual visual = slot.OccupyingCard.GetComponent<CardVisual>();
+            if (visual == null) continue;
+            int boardAssetId = (library != null) ? library.GetMappedAssetID(visual.CardID) : visual.CardID;
+            int boardTier = visual.GetCurrentTier();
+            if (boardAssetId == seekAssetId && boardTier == tier && boardTier < 3)
+            {
+                matchingCard = slot.OccupyingCard;
+                slotIndex = slot.SlotIndex;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>True if the player board has a card that matches this CardID and tier (allows play when board is full).</summary>
+    public bool HasMatchingBoardCardForUpgrade(int cardId, int tier)
+    {
+        return TryGetMatchingBoardCard(cardId, tier, out _, out _);
+    }
+
+    /// <summary>Run merge animation and upgrade when playing from hand onto a matching board card (full-board upgrade bypass).</summary>
+    public void RequestMergeFromHand(GameObject cardFromHand, GameObject targetBoardCard)
+    {
+        if (cardFromHand == null || targetBoardCard == null) return;
+        StartCoroutine(PerformMerge(cardFromHand, targetBoardCard, true));
+    }
+
     public bool TryPlaceCard(GameObject card, bool isPlayerCard, int? preferredIndex = null)
     {
         Debug.Log("BOARD MANAGER || TryPlaceCard CALLED");
@@ -577,12 +677,17 @@ public class BoardManager : MonoBehaviour
             cardsByData[data].Add(currentBoard[i]);
         }
 
-        // Find any pair sharing the same CardData
+        // Find any pair sharing the same CardData — only merge if not already max tier (tier 3).
         foreach (var kvp in cardsByData)
         {
             if (kvp.Value.Count >= 2)
             {
                 CardData matchedData = kvp.Key;
+                if (matchedData.nextTier == null)
+                {
+                    Debug.Log($"BOARD MANAGER || Match: {matchedData.cardName} Tier {matchedData.tier} x{kvp.Value.Count} - SKIP (tier 3, no merge)");
+                    continue; // Tier 3 is max; do not merge two tier-3 copies
+                }
                 Debug.Log($"BOARD MANAGER || Match: {matchedData.cardName} Tier {matchedData.tier} x{kvp.Value.Count} - merging!");
 
                 GameObject targetCard = kvp.Value[0];                     // LEFTMOST (upgraded)

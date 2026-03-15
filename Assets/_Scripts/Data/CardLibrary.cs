@@ -32,5 +32,15 @@ public class CardLibrary : ScriptableObject
         int assetID = GetMappedAssetID(poolID);
 		return GetCardAssetByID(assetID);
     }
+
+	/// <summary>Get CardData for a given pool ID and tier (1, 2, or 3). Walks nextTier from tier-1.</summary>
+	public CardData GetCardDataForTier(int poolID, int tier)
+	{
+		CardData data = GetTierOneAssetFromPool(poolID);
+		if (data == null) return null;
+		for (int t = 1; t < tier && data != null; t++)
+			data = data.nextTier;
+		return data;
+	}
 }
 

@@ -486,6 +486,41 @@ public class PlayerNetwork : NetworkBehaviour {
 		}
 	}
 
+	/// <summary>Full-board upgrade: spend 1 AP and remove card from hand when merging from hand onto an existing board card. Tier update is sent later via UpgradeBoardCardTierServerRpc.</summary>
+	[ServerRpc]
+	public void PlayCardUpgradeFromHandServerRpc(int cardId, int slotIndex, ServerRpcParams serverRpcParams = default) {
+		if (!IsServer) return;
+
+		if (GameManager.Instance == null || GameManager.Instance.CurrentPhase.Value != GameManager.GamePhase.Planning) {
+			Debug.Log("PLAYER NETWORK || Cannot upgrade from hand - not in Planning phase");
+			return;
+		}
+		if (playerData.Value.ActionPoints <= 0) {
+			Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} - Not enough AP for upgrade from hand!");
+			return;
+		}
+		PlayerData data = playerData.Value;
+		if (!data.HandCardIds.Contains(cardId)) {
+			Debug.Log($"PLAYER NETWORK || Card {cardId} not in hand for upgrade from hand");
+			return;
+		}
+		if (slotIndex < 0 || slotIndex >= 3) {
+			Debug.Log("PLAYER NETWORK || Invalid slot index for upgrade from hand");
+			return;
+		}
+		while (data.BoardCardIds.Length <= slotIndex) data.BoardCardIds.Add(-1);
+		if (data.BoardCardIds[slotIndex] == -1) {
+			Debug.Log("PLAYER NETWORK || No card in slot for upgrade from hand");
+			return;
+		}
+
+		data.ActionPoints--;
+		data.HandCardIds.Remove(cardId);
+		data.UpdateHandCount();
+		playerData.Value = data;
+		Debug.Log($"PLAYER NETWORK || Upgrade from hand: spent 1 AP, removed card {cardId}. Slot {slotIndex} will be updated via UpgradeBoardCardTierServerRpc.");
+	}
+
 	[ServerRpc]
 	public void PlayCardToSlotServerRpc(int cardId, int slotIndex, ServerRpcParams serverRpcParams = default) {
 		if (!IsServer) return;
