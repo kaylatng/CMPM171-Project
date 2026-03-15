@@ -24,8 +24,10 @@ public class UITutorialController : MonoBehaviour
 
     [Header("AP Info Overlay")]
     [SerializeField] private GameObject apInfoPanel;             // Grey panel explaining AP usage
+    [SerializeField] private GameObject outgoingDamageArrowHighlight;  // Arrow pointing at outgoing damage display (blinks on step 1)
+    [SerializeField] private TextMeshProUGUI damageOutgoingTextTutorial;  // Text for outgoing damage explanation (step 1)
     [SerializeField] private GameObject apArrowHighlight;        // Arrow pointing at AP display
-    [SerializeField] private TextMeshProUGUI apTutorialText;     // Text shown only on the AP panel
+    [SerializeField] private TextMeshProUGUI apTutorialText;     // Text for AP explanation (step 2)
 
     [Header("Undo Tip (on AP panel)")]
     [SerializeField] private GameObject undoArrowHighlight;      // Arrow pointing at Undo button
@@ -50,6 +52,9 @@ public class UITutorialController : MonoBehaviour
     private TutorialStep currentStep = TutorialStep.None;
     private bool tutorialEnabled;
 
+    /// <summary>0 = damage, 1 = AP, then we switch to UndoTip step.</summary>
+    private int apPanelSubStep = 0;
+
     // One-time merge tip tracking
     private bool hasSeenFirstPlanningPhase = false;
     private bool hasShownMergeTip = false;
@@ -59,6 +64,7 @@ public class UITutorialController : MonoBehaviour
     private Coroutine handFlashRoutine;
     private Coroutine attackFlashRoutine;
     private Coroutine readyFlashRoutine;
+    private Coroutine outgoingDamageArrowFlashRoutine;
     private Coroutine apArrowFlashRoutine;
     private Coroutine undoArrowFlashRoutine;
 
@@ -110,12 +116,17 @@ public class UITutorialController : MonoBehaviour
         {
             apTutorialText.gameObject.SetActive(false);
         }
+        if (damageOutgoingTextTutorial != null)
+        {
+            damageOutgoingTextTutorial.gameObject.SetActive(false);
+        }
 
         // Ensure highlights are visual-only and do not block clicks.
         ConfigureHighlightForClicks(deckHighlight);
         ConfigureHighlightForClicks(handCardHighlight);
         ConfigureHighlightForClicks(attackCardHighlight);
         ConfigureHighlightForClicks(readyHighlight);
+        ConfigureHighlightForClicks(outgoingDamageArrowHighlight);
         ConfigureHighlightForClicks(apArrowHighlight);
         ConfigureHighlightForClicks(undoArrowHighlight);
         if (tutorialText != null)
@@ -243,38 +254,49 @@ public class UITutorialController : MonoBehaviour
     private void BeginApStep()
     {
         currentStep = TutorialStep.HighlightAp;
+        apPanelSubStep = 0;
 
         SetHighlight(deckHighlight, false);
         SetHighlight(handCardHighlight, false);
         SetHighlight(attackCardHighlight, false);
         SetHighlight(readyHighlight, false);
+        SetHighlight(outgoingDamageArrowHighlight, false);
+        SetHighlight(apArrowHighlight, false);
+        SetHighlight(undoArrowHighlight, false);
 
         if (apInfoPanel != null)
         {
             apInfoPanel.SetActive(true);
         }
 
-        if (apArrowHighlight != null)
-        {
-            SetHighlight(apArrowHighlight, true);
-
-            if (apArrowFlashRoutine == null)
-            {
-                apArrowFlashRoutine = StartCoroutine(FlashApArrowHighlight());
-            }
-        }
-
-        // Keep main tutorial text empty during AP step; let a dedicated apTutorialText handle copy.
+        // Keep main tutorial text empty during AP step.
         if (tutorialText != null)
         {
             tutorialText.text = string.Empty;
             tutorialText.gameObject.SetActive(false);
         }
 
+        // Step 1: Outgoing damage explanation first; show damage text and blink the damage arrow.
         if (apTutorialText != null)
         {
-            apTutorialText.gameObject.SetActive(true);
-            // You can set the actual string in the Inspector; we won't override it here.
+            apTutorialText.gameObject.SetActive(false);
+        }
+        if (damageOutgoingTextTutorial != null)
+        {
+            damageOutgoingTextTutorial.gameObject.SetActive(true);
+            damageOutgoingTextTutorial.text = "Outgoing damage shows the total damage your attacking cards will deal to your opponent's health. First player to reach 0 HP loses! Click to continue.";
+        }
+        if (outgoingDamageArrowHighlight != null)
+        {
+            SetHighlight(outgoingDamageArrowHighlight, true);
+            if (outgoingDamageArrowFlashRoutine == null)
+            {
+                outgoingDamageArrowFlashRoutine = StartCoroutine(FlashOutgoingDamageArrowHighlight());
+            }
+        }
+        if (undoTutorialText != null)
+        {
+            undoTutorialText.gameObject.SetActive(false);
         }
     }
 
@@ -314,6 +336,7 @@ public class UITutorialController : MonoBehaviour
         SetHighlight(handCardHighlight, false);
         SetHighlight(attackCardHighlight, false);
         SetHighlight(readyHighlight, false);
+        SetHighlight(outgoingDamageArrowHighlight, false);
         SetHighlight(apArrowHighlight, false);
 
         if (apInfoPanel != null)
@@ -323,6 +346,10 @@ public class UITutorialController : MonoBehaviour
         if (apTutorialText != null)
         {
             apTutorialText.gameObject.SetActive(false);
+        }
+        if (damageOutgoingTextTutorial != null)
+        {
+            damageOutgoingTextTutorial.gameObject.SetActive(false);
         }
 
         if (tutorialText != null)
@@ -340,6 +367,7 @@ public class UITutorialController : MonoBehaviour
         SetHighlight(handCardHighlight, false);
         SetHighlight(attackCardHighlight, false);
         SetHighlight(readyHighlight, false);
+        SetHighlight(outgoingDamageArrowHighlight, false);
 
         if (tutorialText != null)
         {
@@ -348,6 +376,10 @@ public class UITutorialController : MonoBehaviour
         if (apTutorialText != null)
         {
             apTutorialText.gameObject.SetActive(false);
+        }
+        if (damageOutgoingTextTutorial != null)
+        {
+            damageOutgoingTextTutorial.gameObject.SetActive(false);
         }
         if (undoTutorialText != null)
         {
@@ -605,6 +637,55 @@ public class UITutorialController : MonoBehaviour
         readyFlashRoutine = null;
     }
 
+    private System.Collections.IEnumerator FlashOutgoingDamageArrowHighlight()
+    {
+        if (outgoingDamageArrowHighlight == null)
+        {
+            outgoingDamageArrowFlashRoutine = null;
+            yield break;
+        }
+
+        var sr = outgoingDamageArrowHighlight.GetComponent<SpriteRenderer>();
+        var img = outgoingDamageArrowHighlight.GetComponent<Image>();
+        if (sr == null && img == null)
+        {
+            outgoingDamageArrowFlashRoutine = null;
+            yield break;
+        }
+
+        Color original = sr != null ? sr.color : img.color;
+        float maxAlpha = original.a;
+        float minAlpha = 0.15f * maxAlpha;
+
+        while (tutorialEnabled && currentStep == TutorialStep.HighlightAp && apPanelSubStep == 0 && outgoingDamageArrowHighlight != null)
+        {
+            if (!outgoingDamageArrowHighlight.activeInHierarchy)
+            {
+                yield return null;
+                continue;
+            }
+
+            float t = Mathf.PingPong(Time.time * 2f, 1f);
+            float eased = t * t * (3f - 2f * t);
+            float alpha = Mathf.Lerp(minAlpha, maxAlpha, eased);
+
+            Color c = original;
+            c.a = alpha;
+            if (sr != null) sr.color = c;
+            if (img != null) img.color = c;
+
+            yield return null;
+        }
+
+        if (outgoingDamageArrowHighlight != null)
+        {
+            if (sr != null) sr.color = original;
+            if (img != null) img.color = original;
+        }
+
+        outgoingDamageArrowFlashRoutine = null;
+    }
+
     private System.Collections.IEnumerator FlashApArrowHighlight()
     {
         if (apArrowHighlight == null)
@@ -738,44 +819,75 @@ public class UITutorialController : MonoBehaviour
     }
 
     /// <summary>
-    /// Called by the AP info overlay or global click while AP/Undo tip is active.
+    /// Called on left-click while AP panel is active. Advances: damage → AP → undo → close.
     /// </summary>
     public void NotifyApOverlayClicked()
     {
         if (!tutorialEnabled) return;
 
-        // First click: move from AP explanation to Undo explanation (on same panel).
         if (currentStep == TutorialStep.HighlightAp)
         {
-            if (apArrowHighlight != null)
+            if (apPanelSubStep == 0)
             {
-                SetHighlight(apArrowHighlight, false);
-            }
-            if (apTutorialText != null)
-            {
-                apTutorialText.gameObject.SetActive(false);
-            }
-
-            // Show Undo tip on the same AP panel.
-            currentStep = TutorialStep.UndoTip;
-
-            if (undoArrowHighlight != null)
-            {
-                SetHighlight(undoArrowHighlight, true);
-                if (undoArrowFlashRoutine == null)
+                // First click: hide damage text and arrow, show AP explanation and AP arrow.
+                apPanelSubStep = 1;
+                if (outgoingDamageArrowHighlight != null)
                 {
-                    undoArrowFlashRoutine = StartCoroutine(FlashUndoArrowHighlight());
+                    SetHighlight(outgoingDamageArrowHighlight, false);
                 }
+                if (damageOutgoingTextTutorial != null)
+                {
+                    damageOutgoingTextTutorial.gameObject.SetActive(false);
+                }
+                if (apTutorialText != null)
+                {
+                    apTutorialText.gameObject.SetActive(true);
+                    apTutorialText.text = "Action Points (AP) are used to play cards and to attack. Manually drawing a card, playing a card or attacking costs 1 AP.";
+                }
+                if (apArrowHighlight != null)
+                {
+                    SetHighlight(apArrowHighlight, true);
+                    if (apArrowFlashRoutine == null)
+                    {
+                        apArrowFlashRoutine = StartCoroutine(FlashApArrowHighlight());
+                    }
+                }
+                return;
             }
 
-            if (undoTutorialText != null)
+            if (apPanelSubStep == 1)
             {
-                undoTutorialText.gameObject.SetActive(true);
-                undoTutorialText.text = "Misplaced a card? Use Undo to return your most recent played card to your hand and refund its cost.";
+                // Second click: switch to Undo explanation, show undo arrow.
+                if (apArrowHighlight != null)
+                {
+                    SetHighlight(apArrowHighlight, false);
+                }
+                if (apTutorialText != null)
+                {
+                    apTutorialText.gameObject.SetActive(false);
+                }
+
+                currentStep = TutorialStep.UndoTip;
+
+                if (undoArrowHighlight != null)
+                {
+                    SetHighlight(undoArrowHighlight, true);
+                    if (undoArrowFlashRoutine == null)
+                    {
+                        undoArrowFlashRoutine = StartCoroutine(FlashUndoArrowHighlight());
+                    }
+                }
+                if (undoTutorialText != null)
+                {
+                    undoTutorialText.gameObject.SetActive(true);
+                    undoTutorialText.text = "Misplaced a card? Use Undo to return your most recent played card to your hand and refund its cost.";
+                }
+                return;
             }
         }
-        // Second click: hide AP panel & Undo tip, proceed to Ready step.
-        else if (currentStep == TutorialStep.UndoTip)
+
+        // Third click (or when already on UndoTip): hide AP panel and go to Ready step.
+        if (currentStep == TutorialStep.UndoTip)
         {
             if (apInfoPanel != null)
             {
