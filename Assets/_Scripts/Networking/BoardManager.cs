@@ -947,6 +947,42 @@ public class BoardManager : MonoBehaviour
         }
     }
 
+    /// <summary>Total outgoing damage from all local player board cards currently marked as attacking.</summary>
+    public int GetLocalPendingAttackDamage()
+    {
+        var seen = new HashSet<GameObject>();
+        int total = 0;
+
+        // Slot-based cards
+        foreach (BoardSlot slot in playerSlots)
+        {
+            if (slot?.OccupyingCard == null) continue;
+            if (!seen.Add(slot.OccupyingCard)) continue;
+
+            var d = slot.OccupyingCard.GetComponent<CardDraggable>();
+            if (d == null || !d.IsAttacking) continue;
+
+            var v = slot.OccupyingCard.GetComponent<CardVisual>();
+            if (v != null)
+                total += v.GetAttackDamage();
+        }
+
+        // Zone-placed cards
+        foreach (GameObject go in playerBoardCards)
+        {
+            if (go == null || !seen.Add(go)) continue;
+
+            var d = go.GetComponent<CardDraggable>();
+            if (d == null || !d.IsAttacking) continue;
+
+            var v = go.GetComponent<CardVisual>();
+            if (v != null)
+                total += v.GetAttackDamage();
+        }
+
+        return total;
+    }
+
     /// <summary>
     /// Called at start of reveal phase: clear tilts, then flip opponent cards, then merge, then (later) attack animations.
     /// </summary>

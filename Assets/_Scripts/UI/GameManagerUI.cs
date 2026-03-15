@@ -51,6 +51,8 @@ public class GameManagerUI : MonoBehaviour
 	[SerializeField] private TextMeshProUGUI manaText;
 	[SerializeField] private TextMeshProUGUI hpText;
 	[SerializeField] private Outline apOutline;
+	[SerializeField, Tooltip("Text label that shows total outgoing damage for all tapped-to-attack cards.")]
+	private TextMeshProUGUI outgoingDamageText;
 	
 	[Header("Opponent Status")]
 	[SerializeField] private TextMeshProUGUI opponentStatusText;
@@ -83,6 +85,12 @@ public class GameManagerUI : MonoBehaviour
 	// cache for AP tweening
 	private int lastDisplayedAp = int.MinValue;
 	private Coroutine apTweenRoutine;
+
+	// cache for outgoing damage tweening
+	private int lastDisplayedOutgoingDamage = int.MinValue;
+	private Coroutine outgoingDamageTweenRoutine;
+	/// <summary>When >= 0, show this value instead of live pending damage until next Planning phase.</summary>
+	private int frozenOutgoingDamage = -1;
 
 	// shake/outline feedback for "no AP" attempts
 	private RectTransform apTextRect;
@@ -275,6 +283,8 @@ public class GameManagerUI : MonoBehaviour
 				return;
 			}
 
+			// Freeze outgoing damage display to current total before clearing intents (stays until next Planning)
+			frozenOutgoingDamage = GetPendingAttackDamage();
 			// Submit all toggled attack intents before marking ready (resources deducted on server when RPCs are processed)
 			if (BoardManager.Instance != null)
 				BoardManager.Instance.SubmitLocalAttackIntents();
@@ -330,6 +340,7 @@ public class GameManagerUI : MonoBehaviour
 		// re-enable ready button when entering planning phase
 		if (newPhase == GameManager.GamePhase.Planning)
 		{
+			frozenOutgoingDamage = -1; // reset so outgoing damage shows live again (0 until they tap cards)
 			UpdateReadyButton(false);
 			ClearUndoState();
 			
@@ -752,6 +763,10 @@ public class GameManagerUI : MonoBehaviour
 		int pending = GetPendingAttackDeduction();
 		// Pending attacks now only cost AP; mana is not required.
 		UpdateResourceUI(ap - pending, mana, health);
+		int damageToShow = GameManager.Instance != null && GameManager.Instance.CanPlayCards() && frozenOutgoingDamage < 0
+			? GetPendingAttackDamage()
+			: (frozenOutgoingDamage >= 0 ? frozenOutgoingDamage : 0);
+		UpdateOutgoingDamageUI(damageToShow);
 		UpdateUndoButtonState();
 	}
 
@@ -761,6 +776,10 @@ public class GameManagerUI : MonoBehaviour
 		int pending = GetPendingAttackDeduction();
 		// Pending attacks now only cost AP; mana is not required.
 		UpdateResourceUI(ap - pending, mana, health);
+		int damageToShow = GameManager.Instance != null && GameManager.Instance.CanPlayCards() && frozenOutgoingDamage < 0
+			? GetPendingAttackDamage()
+			: (frozenOutgoingDamage >= 0 ? frozenOutgoingDamage : 0);
+		UpdateOutgoingDamageUI(damageToShow);
 		UpdateUndoButtonState();
 	}
 
@@ -769,6 +788,14 @@ public class GameManagerUI : MonoBehaviour
 		if (GameManager.Instance == null || !GameManager.Instance.CanPlayCards() || BoardManager.Instance == null)
 			return 0;
 		return BoardManager.Instance.GetLocalPendingAttackCount();
+	}
+
+	/// <summary>Total outgoing damage from all local cards currently tapped to attack.</summary>
+	private int GetPendingAttackDamage()
+	{
+		if (GameManager.Instance == null || !GameManager.Instance.CanPlayCards() || BoardManager.Instance == null)
+			return 0;
+		return BoardManager.Instance.GetLocalPendingAttackDamage();
 	}
 
 	public void UpdateResourceUI(int ap, int mana, int health)
@@ -829,6 +856,39 @@ public class GameManagerUI : MonoBehaviour
 			// 	hpText.color = Color.white;
 			hpText.color = Color.white;
 		}
+	}
+
+	/// <summary>Update the outgoing damage panel text and play a small scale tween when it changes.</summary>
+	private void UpdateOutgoingDamageUI(int totalDamage)
+	{
+		if (outgoingDamageText == null)
+			return;
+
+		// Display "0" when there is no pending damage.
+		outgoingDamageText.text = totalDamage.ToString();
+
+		if (totalDamage == lastDisplayedOutgoingDamage)
+			return;
+
+		lastDisplayedOutgoingDamage = totalDamage;
+
+		if (outgoingDamageTweenRoutine != null)
+		{
+			StopCoroutine(outgoingDamageTweenRoutine);
+			outgoingDamageTweenRoutine = null;
+		}
+
+		var rt = outgoingDamageText.rectTransform;
+		rt.localScale = Vector3.one * 1.35f; // start slightly larger, like AP
+
+		outgoingDamageTweenRoutine = StartCoroutine(TweenScale(
+			rt,
+			rt.localScale,
+			Vector3.one,
+			0.25f,
+			EaseOutBack,
+			onComplete: () => outgoingDamageTweenRoutine = null
+		));
 	}
 
 	private void OnDestroy()
