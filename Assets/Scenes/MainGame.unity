@@ -558,7 +558,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Card Name
+  m_text: Synergies
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 61bc85651c138094181038655e80bcce, type: 2}
   m_sharedMaterial: {fileID: -4283298451182813959, guid: 61bc85651c138094181038655e80bcce, type: 2}
