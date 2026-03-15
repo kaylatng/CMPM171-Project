@@ -40,6 +40,9 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     
     public static CardDraggable SelectedCard { get; private set; }
 
+    /// <summary>When false, blocks drag and click (e.g. during merge animation).</summary>
+    private bool isInteractable = true;
+
     public bool IsDragging => isDragging;
     public bool IsSelected => isSelected;
     public bool IsOnBoard => isOnBoard;
@@ -60,8 +63,12 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         originalRotation = transform.localRotation;
     }
 
+    /// <summary>Set to false during merge/upgrade animation to block touch and drag.</summary>
+    public void SetInteractable(bool value) { isInteractable = value; }
+
     public void OnPointerClick(PointerEventData eventData)
     {
+        if (!isInteractable) return;
         if (isDragging) return;
         if (!IsPlayerCard()) return;
 
@@ -143,7 +150,11 @@ public class CardDraggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     }
 
     public void OnBeginDrag(PointerEventData eventData)
-    {   
+    {
+        if (!isInteractable)
+        {
+            return;
+        }
         if (!IsPlayerCard()) 
         {
             Debug.Log($"CARD DRAGGABLE || Drag blocked - not a player card");

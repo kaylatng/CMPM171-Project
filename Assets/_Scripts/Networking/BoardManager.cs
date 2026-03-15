@@ -724,6 +724,12 @@ public class BoardManager : MonoBehaviour
             yield break;
         }
 
+        // Disable interaction on both cards during the merge animation
+        var mergeDraggable = cardToMerge.GetComponent<CardDraggable>();
+        var targetDraggable = targetCard.GetComponent<CardDraggable>();
+        if (mergeDraggable != null) mergeDraggable.SetInteractable(false);
+        if (targetDraggable != null) targetDraggable.SetInteractable(false);
+
         // Get current tier data from the actual card (not the base tier)
         CardData currentData = targetVisual.CurrentCardData;
         
@@ -857,6 +863,9 @@ public class BoardManager : MonoBehaviour
 
         // Reset target card scale
         targetCard.transform.localScale = targetStartScale;
+
+        // Re-enable interaction on the target card (cardToMerge was destroyed)
+        if (targetDraggable != null) targetDraggable.SetInteractable(true);
 
         // Rearrange remaining cards
         ArrangeCardsOnBoard(isPlayerBoard);
