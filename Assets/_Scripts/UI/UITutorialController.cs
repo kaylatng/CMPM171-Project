@@ -198,7 +198,7 @@ public class UITutorialController : MonoBehaviour
         if (tutorialText != null)
         {
             tutorialText.gameObject.SetActive(true);
-            tutorialText.text = "Click the shared deck to draw a card. Your opponent is using the same deck!";
+            tutorialText.text = "Click the shared deck to draw a card. Your opponent is using the same deck! Your hand limit is 5 cards.";
         }
     }
 

@@ -714,6 +714,22 @@ public class PlayerNetwork : NetworkBehaviour {
 		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} slot {slotIndex} card removed (out of charges)");
 	}
 
+	/// <summary>Client calls when two board cards merge: clear the slot that had the merged-away card so server board matches client (avoids phantom swap and hand count bug).</summary>
+	[ServerRpc]
+	public void ClearBoardSlotServerRpc(int slotIndex) {
+		if (!IsServer) return;
+		if (slotIndex < 0 || slotIndex >= 3) return;
+		PlayerData data = playerData.Value;
+		while (data.BoardCardIds.Length <= slotIndex) data.BoardCardIds.Add(-1);
+		while (data.BoardCardCharges.Length <= slotIndex) data.BoardCardCharges.Add(0);
+		while (data.BoardCardTiers.Length <= slotIndex) data.BoardCardTiers.Add(1);
+		data.BoardCardIds[slotIndex] = -1;
+		data.BoardCardCharges[slotIndex] = 0;
+		data.BoardCardTiers[slotIndex] = 1;
+		playerData.Value = data;
+		Debug.Log($"PLAYER NETWORK || Player {OwnerClientId} slot {slotIndex} cleared (board merge)");
+	}
+
 	/// <summary>Server only. Upgrade card tier and refresh its max charges in a board slot.</summary>
 	[ServerRpc]
 	public void UpgradeBoardCardTierServerRpc(int slotIndex, int newTier, int newMaxCharges) {

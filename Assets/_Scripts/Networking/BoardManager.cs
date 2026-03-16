@@ -4,7 +4,6 @@ using Unity.Collections;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 
 public class BoardManager : MonoBehaviour
@@ -243,16 +242,10 @@ public class BoardManager : MonoBehaviour
 
             if (needCardId < 0)
             {
-                // Server says slot is empty; if we still have a card here, remove it
+                // Server says slot is empty (merge or swap); remove the card from our board view only.
+                // Do not add to opponent hand: opponent hand is display-only placeholders, and on merge the card was destroyed, not returned.
                 if (hasExistingCard)
-                {
                     RemoveOneOpponentCardAt(i);
-                    // Card went back to opponent hand (e.g. undo/swap back on server) — add one blank to opponent hand view.
-                    if (CardManager.Instance != null)
-                    {
-                        CardManager.Instance.AddOneOpponentHandCard();
-                    }
-                }
                 continue;
             }
 
@@ -714,6 +707,19 @@ public class BoardManager : MonoBehaviour
     {
         Debug.Log($"BOARD MANAGER || Merging cards - {cardToMerge.name} flying into {targetCard.name}");
 
+        // Resolve slot indices before removing/destroying anything (server must clear merged-out slot to avoid hand count bug)
+        int slotToClear = -1;
+        int slotToUpgrade = -1;
+        if (isPlayerBoard)
+        {
+            var dMerge = cardToMerge.GetComponent<CardDraggable>();
+            var dTarget = targetCard.GetComponent<CardDraggable>();
+            if (dMerge != null && dMerge.CurrentSlot != null) slotToClear = dMerge.CurrentSlot.SlotIndex;
+            else slotToClear = GetCardBoardIndex(cardToMerge, true);
+            if (dTarget != null && dTarget.CurrentSlot != null) slotToUpgrade = dTarget.CurrentSlot.SlotIndex;
+            else slotToUpgrade = GetCardBoardIndex(targetCard, true);
+        }
+
         // Get the visual components
         CardVisual mergeVisual = cardToMerge.GetComponent<CardVisual>();
         CardVisual targetVisual = targetCard.GetComponent<CardVisual>();
@@ -756,6 +762,9 @@ public class BoardManager : MonoBehaviour
         // Animate the RIGHT card flying INTO the LEFT card
         while (elapsed < mergeAnimationDuration)
         {
+            // Opponent board sync can destroy these objects during yield; bail if so
+            if (cardToMerge == null || targetCard == null)
+                yield break;
             elapsed += Time.deltaTime;
             float t = elapsed / mergeAnimationDuration;
             float curveT = mergeScaleCurve.Evaluate(t);
@@ -780,6 +789,10 @@ public class BoardManager : MonoBehaviour
             yield return null;
         }
 
+        // Opponent board sync may have destroyed cards during animation
+        if (cardToMerge == null || targetCard == null)
+            yield break;
+
         // Remove the merged card from board
         List<GameObject> currentBoard = isPlayerBoard ? playerBoardCards : opponentBoardCards;
         currentBoard.Remove(cardToMerge);
@@ -788,7 +801,7 @@ public class BoardManager : MonoBehaviour
         Destroy(cardToMerge);
 
 		// UPGRADE THE TARGET CARD TO NEXT TIER
-		if (currentData.nextTier != null)
+		if (currentData.nextTier != null && targetCard != null && targetVisual != null)
 		{
 			Debug.Log($"BOARD MANAGER || Upgrading card from tier {currentData.tier} to tier {currentData.nextTier.tier}");
 			// Update the visual with new tier data (frame, art, local charges)
@@ -801,51 +814,44 @@ public class BoardManager : MonoBehaviour
             }
 
             // Tier-Up UI feedback for the local player's merges
-            if (isPlayerBoard && GameManagerUI.Instance != null)
+            if (isPlayerBoard && GameManagerUI.Instance != null && targetCard != null)
             {
                 GameManagerUI.Instance.PlayTierUpPopup(targetCard.transform);
             }
 
-			// Tell the server about the new tier + max charges so damage/charges are authoritative
+			// Tell the server: clear merged-out slot so board matches client (avoids phantom swap / hand count bug), then upgrade target slot
 			if (isPlayerBoard && Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsClient)
 			{
 				var localPlayer = Unity.Netcode.NetworkManager.Singleton.LocalClient?.
 					PlayerObject?.GetComponent<PlayerNetwork>();
 				if (localPlayer != null)
 				{
-					// Prefer slot index if this card is in a BoardSlot; otherwise fall back to board index
-					int slotIndex = -1;
-					var d = targetCard.GetComponent<CardDraggable>();
-					if (d != null && d.CurrentSlot != null)
+					if (slotToClear >= 0)
 					{
-						slotIndex = d.CurrentSlot.SlotIndex;
+						localPlayer.ClearBoardSlotServerRpc(slotToClear);
+						Debug.Log($"BOARD MANAGER || Notified server to clear merged-out slot {slotToClear}");
 					}
-					else
-					{
-						slotIndex = GetCardBoardIndex(targetCard, true);
-					}
-
-					if (slotIndex >= 0)
+					if (slotToUpgrade >= 0)
 					{
 						int newTier = targetVisual.GetCurrentTier();
 						int newMaxCharges = (currentData.nextTier.maxCharges > 0)
 							? currentData.nextTier.maxCharges
 							: targetVisual.CurrentCharges;
-						localPlayer.UpgradeBoardCardTierServerRpc(slotIndex, newTier, newMaxCharges);
-						Debug.Log($"BOARD MANAGER || Notified server of tier upgrade slot {slotIndex} -> tier {newTier}, charges {newMaxCharges}");
+						localPlayer.UpgradeBoardCardTierServerRpc(slotToUpgrade, newTier, newMaxCharges);
+						Debug.Log($"BOARD MANAGER || Notified server of tier upgrade slot {slotToUpgrade} -> tier {newTier}, charges {newMaxCharges}");
 					}
 				}
 			}
             
-			// Visual feedback for upgrade
-			if (targetSR != null)
+			// Visual feedback for upgrade (target may be destroyed by opponent sync)
+			if (targetCard != null && targetSR != null)
 			{
 				targetSR.color = mergeFlashColor;
 			}
             
 			yield return new WaitForSeconds(0.2f);
-            
-			if (targetSR != null)
+			// targetCard may have been destroyed by opponent board sync during wait
+			if (targetCard != null && targetSR != null)
 			{
 				targetSR.color = currentData.nextTier.themeColor;
 			}
@@ -861,7 +867,9 @@ public class BoardManager : MonoBehaviour
 			}
 		}
 
-        // Reset target card scale
+        // Reset target card scale (bail if target was destroyed by sync during merge)
+        if (targetCard == null)
+            yield break;
         targetCard.transform.localScale = targetStartScale;
 
         // Re-enable interaction on the target card (cardToMerge was destroyed)
@@ -1497,7 +1505,8 @@ public class BoardManager : MonoBehaviour
         // If card is being placed in a player slot and should notify server
         if (slot.IsPlayerSlot && shouldNotifyServer)
         {
-            NotifyServerCardPlaced(card);
+            // Pass slot index: when placing via slot the card is not in playerBoardCards yet, so use slot.SlotIndex
+            NotifyServerCardPlaced(card, slot.SlotIndex);
         }
 
         Debug.Log($"BOARD MANAGER || Card placed in slot {slot.SlotIndex} (notify server: {shouldNotifyServer})");
@@ -1521,13 +1530,21 @@ public class BoardManager : MonoBehaviour
     }
 
     // Network integration points
-    private void NotifyServerCardPlaced(GameObject card)
+    /// <param name="card">The card that was placed.</param>
+    /// <param name="slotIndex">When placing via a BoardSlot, pass the slot index (card is not in playerBoardCards). Otherwise null to use list index.</param>
+    private void NotifyServerCardPlaced(GameObject card, int? slotIndex = null)
     {
         CardVisual visual = card.GetComponent<CardVisual>();
         if (visual == null) return;
 
         int cardId = visual.CardID;
-        int index = playerBoardCards.IndexOf(card);
+        int index = slotIndex ?? playerBoardCards.IndexOf(card);
+
+        if (index < 0 || index >= 3)
+        {
+            Debug.LogWarning($"BOARD MANAGER || NotifyServerCardPlaced: invalid slot index {index}, not sending RPC");
+            return;
+        }
 
         // Call your existing network RPC
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient)
