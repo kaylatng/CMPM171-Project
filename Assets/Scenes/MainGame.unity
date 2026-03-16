@@ -6857,6 +6857,71 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.AspectRatioFitter
   m_AspectMode: 1
   m_AspectRatio: 1.0458997
+--- !u!1 &1375727064
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1375727066}
+  - component: {fileID: 1375727065}
+  m_Layer: 0
+  m_Name: UIGrayscaleTinter
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1375727065
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1375727064}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d61fbe219a77eee40aa2d18011a98385, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIGreyscaleTinter
+  uiGraphics:
+  - {fileID: 828019831}
+  - {fileID: 1354735859}
+  - {fileID: 1824281872}
+  - {fileID: 1223648071}
+  - {fileID: 829811104}
+  - {fileID: 521715135}
+  - {fileID: 1740544469}
+  - {fileID: 1713868877}
+  - {fileID: 1361011510}
+  - {fileID: 653717955}
+  - {fileID: 29059396}
+  - {fileID: 957503205}
+  - {fileID: 1972941941}
+  - {fileID: 1315092234}
+  - {fileID: 1608401257}
+  - {fileID: 1706355116}
+  - {fileID: 501525440}
+  - {fileID: 1575564995}
+  - {fileID: 1702881576}
+  greyscaleColor: {r: 0.5019608, g: 0.5019608, b: 0.5019608, a: 1}
+--- !u!4 &1375727066
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1375727064}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -25.75049, y: 4.08463, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1382598330
 GameObject:
   m_ObjectHideFlags: 0
@@ -10275,6 +10340,7 @@ SceneRoots:
   - {fileID: 1148329693}
   - {fileID: 298794121}
   - {fileID: 543411597}
+  - {fileID: 1375727066}
   - {fileID: 1660150826}
   - {fileID: 1164745797}
   - {fileID: 1501947292}

@@ -84,6 +84,7 @@
     <Compile Include="Assets\_Scripts\Networking\GameManager.cs" />
     <Compile Include="Assets\_Scripts\Networking\DeckManager.cs" />
     <Compile Include="Assets\_Scripts\Audio\BGMController.cs" />
+    <Compile Include="Assets\_Scripts\UI\UIGreyscaleTinter.cs" />
     <Compile Include="Assets\_Scripts\Data\CardLibrary.cs" />
   </ItemGroup>
   <ItemGroup>

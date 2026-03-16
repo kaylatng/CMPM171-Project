@@ -13,6 +13,8 @@ using UnityEngine.Rendering.Universal;
 /// </summary>
 public class HighContrastGrayscaleFilter : MonoBehaviour
 {
+    public static bool IsEnabled { get; private set; }
+
     [Header("Post‑processing volume with grayscale settings")]
     [SerializeField] private Volume grayscaleVolume;
 
@@ -24,6 +26,8 @@ public class HighContrastGrayscaleFilter : MonoBehaviour
             grayscaleVolume.enabled = false;
             grayscaleVolume.weight = 0f;
         }
+
+        IsEnabled = false;
     }
 
     /// <summary>
@@ -35,6 +39,8 @@ public class HighContrastGrayscaleFilter : MonoBehaviour
 
         grayscaleVolume.enabled = enabled;
         grayscaleVolume.weight = enabled ? 1f : 0f;
+
+        IsEnabled = enabled;
     }
 
     /// <summary>
