@@ -9,21 +9,36 @@ using TMPro;
 public class UIGreyscaleTinter : MonoBehaviour
 {
     [SerializeField] private Graphic[] uiGraphics;
+    [SerializeField] private Shadow[] shadowEffects;   // Outline and Shadow components
     [SerializeField] private Color greyscaleColor = Color.gray;
 
-    private Color[] originalColors;
+    private Color[] originalGraphicColors;
+    private bool[] originalShadowEnabled;
     private bool isGreyscale;
 
     private void Awake()
     {
-        if (uiGraphics == null) return;
-
-        originalColors = new Color[uiGraphics.Length];
-        for (int i = 0; i < uiGraphics.Length; i++)
+        if (uiGraphics != null)
         {
-            if (uiGraphics[i] != null)
+            originalGraphicColors = new Color[uiGraphics.Length];
+            for (int i = 0; i < uiGraphics.Length; i++)
             {
-                originalColors[i] = uiGraphics[i].color;
+                if (uiGraphics[i] != null)
+                {
+                    originalGraphicColors[i] = uiGraphics[i].color;
+                }
+            }
+        }
+
+        if (shadowEffects != null)
+        {
+            originalShadowEnabled = new bool[shadowEffects.Length];
+            for (int i = 0; i < shadowEffects.Length; i++)
+            {
+                if (shadowEffects[i] != null)
+                {
+                    originalShadowEnabled[i] = shadowEffects[i].enabled;
+                }
             }
         }
 
@@ -39,12 +54,24 @@ public class UIGreyscaleTinter : MonoBehaviour
     {
         isGreyscale = enabled;
 
-        if (uiGraphics == null || originalColors == null) return;
-
-        for (int i = 0; i < uiGraphics.Length; i++)
+        if (uiGraphics != null && originalGraphicColors != null)
         {
-            if (uiGraphics[i] == null) continue;
-            uiGraphics[i].color = enabled ? greyscaleColor : originalColors[i];
+            for (int i = 0; i < uiGraphics.Length; i++)
+            {
+                if (uiGraphics[i] == null) continue;
+                uiGraphics[i].color = enabled ? greyscaleColor : originalGraphicColors[i];
+            }
+        }
+
+        if (shadowEffects != null && originalShadowEnabled != null)
+        {
+            for (int i = 0; i < shadowEffects.Length; i++)
+            {
+                if (shadowEffects[i] == null) continue;
+                // When greyscale is on, hide shadows/outlines for a flatter look.
+                // When off, restore their original enabled state.
+                shadowEffects[i].enabled = enabled ? false : originalShadowEnabled[i];
+            }
         }
     }
 
