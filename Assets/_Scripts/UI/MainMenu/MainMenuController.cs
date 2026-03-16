@@ -4,6 +4,7 @@ public class MainMenuController : MonoBehaviour
 {
     [SerializeField] private GameObject mainMenuRoot;   // container with Play / Options / Quit
     [SerializeField] private GameObject onlinePlayPanel; // your connection panel
+    [SerializeField] private GameObject settingsPanel;   // settings panel with grayscale toggle
 
     private void Awake()
     {
@@ -19,10 +20,24 @@ public class MainMenuController : MonoBehaviour
         onlinePlayPanel.SetActive(true);
     }
 
+    public void OnSettingsButton()
+    {
+        // Open settings panel from main menu
+        mainMenuRoot.SetActive(false);
+        if (settingsPanel != null) settingsPanel.SetActive(true);
+    }
+
     public void OnBackFromOnlinePlay()
     {
         // Go back to main menu
         onlinePlayPanel.SetActive(false);
+        mainMenuRoot.SetActive(true);
+    }
+
+    public void OnBackFromSettings()
+    {
+        // Go back to main menu from settings panel
+        if (settingsPanel != null) settingsPanel.SetActive(false);
         mainMenuRoot.SetActive(true);
     }
 
