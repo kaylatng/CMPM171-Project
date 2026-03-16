@@ -69,11 +69,13 @@
     <Compile Include="Assets\_Scripts\UI\CardDebugger.cs" />
     <Compile Include="Assets\_Scripts\UI\Localization\LocalizedTMPText.cs" />
     <Compile Include="Assets\_Scripts\UI\MainMenu\TutorialToggleHandler.cs" />
+    <Compile Include="Assets\_Scripts\UI\AudioMuteButton.cs" />
     <Compile Include="Assets\_Scripts\UI\Localization\LanguageSwitcher.cs" />
     <Compile Include="Assets\_Scripts\Data\CardManager.cs" />
     <Compile Include="Assets\_Scripts\UI\GameManagerUI.cs" />
     <Compile Include="Assets\_Scripts\UI\CardMergeEffects.cs" />
     <Compile Include="Assets\_Scripts\UI\MainMenu\MainMenuController.cs" />
+    <Compile Include="Assets\_Scripts\Audio\AudioMuteManager.cs" />
     <Compile Include="Assets\_Scripts\UI\CardTooltipOnHover.cs" />
     <Compile Include="Assets\_Scripts\Audio\SFXManager.cs" />
     <Compile Include="Assets\_Scripts\Networking\GameManager.cs" />

@@ -32,6 +32,8 @@ public class SFXManager : MonoBehaviour
 
         sfxSource.playOnAwake = false;
         sfxSource.spatialBlend = 0f;
+
+        AudioMuteManager.ApplyMute();
     }
 
     private void Play(AudioClip clip)
