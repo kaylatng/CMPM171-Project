@@ -70,5 +70,8 @@ To play together, both players must be on the **same Wi-Fi** or **Local Network*
 * **Alasdair Lam** | *Background Music*
 * **Grape Soda Font** | *https://www.dafont.com/grapesoda-2.font*
 * **m6x11 Font** | *https://managore.itch.io/m6x11*
-
-
+* **Card Flip Audio** | *https://freesound.org/people/themfish/sounds/45816/*
+* **Mouse Click Audio** | *https://freesound.org/people/aphom000/sounds/687108/*
+* **Card Upgrade Audio** | *https://freesound.org/people/Cloud-10/sounds/647977/*
+* **Card Attack Audio** | *https://freesound.org/people/Hemplock/sounds/618961/* 
+* **Buzzer Audio** | *https://freesound.org/people/unadamlar/sounds/476177/*
